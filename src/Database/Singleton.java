@@ -8,23 +8,24 @@ import static Database.DatabaseConfig.*;
 
 public class Singleton {
 
-    private static final Connection con;
+
+
+
+
     static {
-        try{
-            Class.forName(NOM_DRIVER);
-            con= DriverManager.getConnection(URL_DB,USERNAME,PASSWORD);
-            System.out.println("Connected!");
-        }catch (ClassNotFoundException | SQLException e){
-            throw new RuntimeException(e);
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException("MySQL JDBC Driver not found", e);
         }
     }
 
-    public static Connection getConnection(){
-        return con;
+    // Creates a NEW connection per call (thread-safe for Swing EDT + Network threads)
+    public static Connection getConnection() throws SQLException {
+        return DriverManager.getConnection(URL_DB,USERNAME,PASSWORD);
     }
-
     public static void main(String[] args) {
-        System.out.println(Singleton.getConnection());
+//        System.out.println(Singleton.getConnection());
 
         String request_insertion= "insert into etudiant values(65468776,'test','user',15);";
 
