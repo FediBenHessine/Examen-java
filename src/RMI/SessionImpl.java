@@ -28,7 +28,7 @@ public class SessionImpl extends UnicastRemoteObject implements RemoteSession {
     }
 
     @Override
-    public synchronized void notifySessionStart() throws RemoteException {
+    public synchronized int notifySessionStart() throws RemoteException {
         if (currentUser == null) throw new RemoteException("No user registered. Call registerUser first.");
         if (isActive) throw new RemoteException("Session already active");
 
@@ -42,6 +42,7 @@ public class SessionImpl extends UnicastRemoteObject implements RemoteSession {
         if (currentSessionId <= 0) throw new RemoteException("Failed to create session in database");
 
         isActive = true;
+        return currentSessionId;
     }
 
     @Override

@@ -17,15 +17,9 @@ public class DatabaseManager {
             ps.setString(1, username);
             ps.setString(2, password);
             try (ResultSet rs = ps.executeQuery()) {
-                ResultSetMetaData rsm = rs.getMetaData();
-
-                while (rs.next()  ){
-                    for(int i = 1; i<=(rsm.getColumnCount());i++){
-                    System.out.println(rs.getObject(i));
-                    i++;}
-                }
+                // true only if a matching row exists
+                return rs.next();
             }
-            return true;
         } catch (SQLException e) {
             System.err.println("DB Auth Error: " + e.getMessage());
             return false;
@@ -69,6 +63,42 @@ public class DatabaseManager {
         } catch (SQLException e) {
             System.err.println("DB userExists Error: " + e.getMessage());
             return false;
+        }
+    }
+
+    public static void insertDrawCommand(int sessionId, Model.DrawCommand cmd) {
+        if (sessionId <= 0 || cmd == null || cmd.type == null) return;
+
+        String sql = "INSERT INTO draw_commands " +
+                "(session_id, cmd_type, x1, y1, x2, y2, color_hex, stroke_width, tool_name) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, sessionId);
+            ps.setString(2, cmd.type.name());
+
+            if (cmd.type == Model.DrawCommand.Type.CLEAR || cmd.type == Model.DrawCommand.Type.PING || cmd.type == Model.DrawCommand.Type.PONG) {
+                ps.setNull(3, Types.DOUBLE);
+                ps.setNull(4, Types.DOUBLE);
+                ps.setNull(5, Types.DOUBLE);
+                ps.setNull(6, Types.DOUBLE);
+                ps.setNull(7, Types.VARCHAR);
+                ps.setNull(8, Types.FLOAT);
+                ps.setNull(9, Types.VARCHAR);
+            } else {
+                ps.setDouble(3, cmd.x1);
+                ps.setDouble(4, cmd.y1);
+                ps.setDouble(5, cmd.x2);
+                ps.setDouble(6, cmd.y2);
+                ps.setString(7, cmd.colorHex);
+                ps.setFloat(8, (float) cmd.strokeWidth);
+                ps.setString(9, cmd.tool);
+            }
+
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            System.err.println("DB insertDrawCommand Error: " + e.getMessage());
         }
     }
 

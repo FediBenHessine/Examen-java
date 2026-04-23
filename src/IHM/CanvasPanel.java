@@ -52,6 +52,9 @@ public class CanvasPanel extends JPanel {
 
     public void setOnLocalDraw(Consumer<String> listener) { this.onLocalDraw = listener; }
     public void setToolSettings(String color, float width) { this.currentColor = color; this.currentStrokeWidth = width; }
+    public void emitLocalCommand(String rawCmd) {
+        if (onLocalDraw != null) onLocalDraw.accept(rawCmd);
+    }
 
     // Called by network thread via SwingUtilities.invokeLater
     public void addRemoteCommand(String rawCmd) {

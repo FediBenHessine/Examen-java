@@ -16,9 +16,20 @@ public class CommandProtocol {
 
     public static DrawCommand deserialize(String line) {
         DrawCommand cmd = new DrawCommand();
-        if (line.equals("PING")) { cmd.type = DrawCommand.Type.PING; return cmd; }
-        if (line.equals("PONG")) { cmd.type = DrawCommand.Type.PONG; return cmd; }
-        if (line.equals("CLEAR")) { cmd.type = DrawCommand.Type.CLEAR; return cmd; }
+        switch (line) {
+            case "PING" -> {
+                cmd.type = DrawCommand.Type.PING;
+                return cmd;
+            }
+            case "PONG" -> {
+                cmd.type = DrawCommand.Type.PONG;
+                return cmd;
+            }
+            case "CLEAR" -> {
+                cmd.type = DrawCommand.Type.CLEAR;
+                return cmd;
+            }
+        }
 
         String[] p = line.split("\\|");
         cmd.type = DrawCommand.Type.valueOf(p[0]);

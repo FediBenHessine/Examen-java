@@ -11,7 +11,7 @@ import java.rmi.Naming;
 import java.rmi.registry.LocateRegistry;
 
 public class Main {
-    private static final String ROLE = System.getProperty("app.role", "HOST");
+    private static final String ROLE = System.getProperty("app.role", "CLIENT");
     private static final String HOST_IP = System.getProperty("app.host_ip", "192.168.1.10");
 
     public static void main(String[] args) {
@@ -23,7 +23,7 @@ public class Main {
             if (username == null) { dummy.dispose(); return; }
 
             try {
-                int sessionId = (ROLE.equals("HOST")) ? setupHost(username) : setupClient(username);
+                int sessionId = (ROLE.equals("CLIENT")) ? setupHost(username) : setupClient(username);
                 boolean isHost = ROLE.equals("HOST");
                 WhiteboardFrame frame = new WhiteboardFrame(isHost, username, sessionId);
                 frame.setVisible(true);
@@ -35,7 +35,7 @@ public class Main {
                     server.setOnClientDisconnected(() -> frame.setAlive(false));
                     server.setOnCommandReceived(cmd -> frame.handleNetworkCommand(cmd));
                     server.start(8083);
-                    frame.updateStatus("Status: ⏳ Waiting for client on :8080...");
+                    frame.updateStatus("Status: ⏳ Waiting for client on :8083...");
                     frame.bindLocalDraw(server::send);
                 } else {
                     SocketClient client = new SocketClient();
@@ -68,14 +68,12 @@ public class Main {
         SessionImpl session = new SessionImpl();
         Naming.rebind("rmi://localhost:1099/WhiteboardSession", session);
         session.registerUser(username);
-        session.notifySessionStart();
-        return -1; // Host session ID tracked internally
+        return session.notifySessionStart();
     }
 
     private static int setupClient(String username) throws Exception {
         RemoteSession remote = (RemoteSession) Naming.lookup("rmi://" + HOST_IP + ":1099/WhiteboardSession");
         remote.registerUser(username);
-        remote.notifySessionStart();
-        return -1;
+        return remote.notifySessionStart();
     }
 }
