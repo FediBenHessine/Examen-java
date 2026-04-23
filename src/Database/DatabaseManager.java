@@ -3,12 +3,14 @@ package Database;
 
 import java.sql.*;
 
+import static Database.Singleton.getConnection;
+
 public class DatabaseManager {
 
 
-    Singleton conn = Singleton.getConnection();
+    Connection conn = getConnection();
 
-    public boolean authenticate(String username, String password) {
+    public  boolean authenticate(String username, String password) {
         String sql = "SELECT 1 FROM users WHERE username = ? AND password_hash = ? LIMIT 1";
 
         try (
@@ -24,7 +26,7 @@ public class DatabaseManager {
         }
     }
 
-    public static int createSession(String hostIP, String clientIP) {
+    public  int createSession(String hostIP, String clientIP) {
         String sql = "INSERT INTO sessions (host_ip, client_ip) VALUES (?, ?)";
         try (Connection conn = getConnection();
              PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
@@ -40,7 +42,7 @@ public class DatabaseManager {
         }
     }
 
-    public static void closeSession(int sessionId) {
+    public  void closeSession(int sessionId) {
         String sql = "UPDATE sessions SET status = 'CLOSED', end_time = CURRENT_TIMESTAMP WHERE id = ?";
         try (Connection conn = getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
