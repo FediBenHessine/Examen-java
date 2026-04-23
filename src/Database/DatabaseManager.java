@@ -11,15 +11,22 @@ public class DatabaseManager {
     Connection conn = getConnection();
 
     public  boolean authenticate(String username, String password) {
-        String sql = "SELECT 1 FROM users WHERE username = ? AND password_hash = ? LIMIT 1";
+        String sql = "SELECT * FROM users WHERE username = ? AND password_hash = ? LIMIT 1";
 
         try (
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, username);
             ps.setString(2, password);
             try (ResultSet rs = ps.executeQuery()) {
-                return rs.next();
+                ResultSetMetaData rsm = rs.getMetaData();
+
+                while (rs.next()  ){
+                    for(int i = 1; i<=(rsm.getColumnCount());i++){
+                    System.out.println(rs.getObject(i));
+                    i++;}
+                }
             }
+            return true;
         } catch (SQLException e) {
             System.err.println("DB Auth Error: " + e.getMessage());
             return false;
@@ -51,5 +58,10 @@ public class DatabaseManager {
         } catch (SQLException e) {
             System.err.println("Session Close Failed: " + e.getMessage());
         }
+    }
+
+    public static void main(String[] args) {
+        DatabaseManager  dm = new DatabaseManager();
+        System.out.println(dm.authenticate("client_user","client123"));
     }
 }
