@@ -1,9 +1,6 @@
 package IHM;
-
-
-
-import Network.CommandProtocol;
 import Model.DrawCommand;
+import Network.CommandProtocol;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
@@ -33,9 +30,10 @@ public class CanvasPanel extends JPanel {
                     currentStroke.x2 = e.getX(); currentStroke.y2 = e.getY();
                     history.add(currentStroke);
                     repaint();
-                    if (onLocalDraw != null) onLocalDraw.accept(currentStroke.type.name() + "|" +
-                            currentStroke.x1 + "|" + currentStroke.y1 + "|" + currentStroke.x2 + "|" + currentStroke.y2 + "|" +
-                            currentStroke.colorHex + "|" + currentStroke.strokeWidth);
+                    if (onLocalDraw != null) {
+                        String cmd = CommandProtocol.serialize(currentStroke);
+                        onLocalDraw.accept(cmd);
+                    }
                     currentStroke = null;
                 }
             }
@@ -52,20 +50,19 @@ public class CanvasPanel extends JPanel {
 
     public void setOnLocalDraw(Consumer<String> listener) { this.onLocalDraw = listener; }
     public void setToolSettings(String color, float width) { this.currentColor = color; this.currentStrokeWidth = width; }
+
+    // ✅ FIX: Complete method
     public void emitLocalCommand(String rawCmd) {
         if (onLocalDraw != null) onLocalDraw.accept(rawCmd);
     }
 
-    // Called by network thread via SwingUtilities.invokeLater
     public void addRemoteCommand(String rawCmd) {
         if ("CLEAR".equals(rawCmd)) { history.clear(); repaint(); return; }
-        if ("PING".equals(rawCmd) || "PONG".equals(rawCmd)) return; // Handled elsewhere
-
+        if ("PING".equals(rawCmd) || "PONG".equals(rawCmd)) return;
         try {
             DrawCommand cmd = CommandProtocol.deserialize(rawCmd);
-            history.add(cmd);
-            repaint();
-        } catch (Exception e) { System.err.println("Invalid remote command: " + rawCmd); }
+            history.add(cmd); repaint();
+        } catch (Exception e) { System.err.println("Invalid cmd: " + rawCmd); }
     }
 
     @Override protected void paintComponent(Graphics g) {

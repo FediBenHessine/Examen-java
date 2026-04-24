@@ -1,7 +1,11 @@
 package Database;
 
 
+import Model.RoomInfo;
+
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
 
 import static Database.Singleton.getConnection;
 
@@ -101,7 +105,151 @@ public class DatabaseManager {
             System.err.println("DB insertDrawCommand Error: " + e.getMessage());
         }
     }
+    // ✅ SIGNUP: Register new user
+    public static boolean signUp(String username, String password, String role) {
+        if (userExists(username)) return false;
 
+        // ⚠️ For demo: store plaintext. Use BCrypt in production!
+        String sql = "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, username);
+            ps.setString(2, password); // TODO: hash with BCrypt
+            ps.setString(3, role);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.err.println("Signup failed: " + e.getMessage());
+            return false;
+        }
+    }
+
+    // ✅ ROOMS: Create new room entry
+    public static int createRoom(String hostUsername, String roomName, Model.RoomType roomType,
+                                 String password, String hostIP, int socketPort) {
+        String sql = "INSERT INTO rooms (host_username, room_name, room_type_id, password_hash, host_ip, socket_port) " +
+                "VALUES (?, ?, ?, ?, ?, ?)";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setString(1, hostUsername);
+            ps.setString(2, roomName);
+            ps.setInt(3, roomType.ordinal() + 1); // 1=PUBLIC, 2=PUBLIC_PASSWORD, 3=PRIVATE
+            ps.setString(4, roomType == Model.RoomType.PUBLIC ? null : password);
+            ps.setString(5, hostIP);
+            ps.setInt(6, socketPort);
+            ps.executeUpdate();
+            try (ResultSet rs = ps.getGeneratedKeys()) {
+                return rs.next() ? rs.getInt(1) : -1;
+            }
+        } catch (SQLException e) {
+            System.err.println("Room creation failed: " + e.getMessage());
+            return -1;
+        }
+    }
+
+    // ✅ ROOMS: Validate join password
+    public static boolean validateRoomPassword(int roomId, String password) {
+        String sql = "SELECT password_hash FROM rooms WHERE id = ? AND is_active = TRUE";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, roomId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return false;
+                String storedHash = rs.getString("password_hash");
+                return storedHash == null || storedHash.equals(password); // Plaintext for demo
+            }
+        } catch (SQLException e) {
+            System.err.println("Password validation failed: " + e.getMessage());
+            return false;
+        }
+    }
+
+    // ✅ ROOMS: Get active public rooms (for discovery list)
+    public static List<RoomInfo> getPublicRooms() {
+        List<Model.RoomInfo> rooms = new ArrayList<>();
+        String sql = "SELECT r.*, u.username as host_username, rt.name as room_type " +
+                "FROM rooms r JOIN users u ON r.host_username = u.username " +
+                "JOIN room_types rt ON r.room_type_id = rt.id " +
+                "WHERE r.is_active = TRUE AND rt.name != 'PRIVATE'";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                Model.RoomType type = Model.RoomType.valueOf(rs.getString("room_type"));
+                rooms.add(new Model.RoomInfo(
+                        rs.getString("room_name"),
+                        rs.getString("host_username"),
+                        rs.getString("host_ip"),
+                        rs.getInt("socket_port"),
+                        type,
+                        type != Model.RoomType.PUBLIC && rs.getString("password_hash") != null
+                ));
+            }
+        } catch (SQLException e) {
+            System.err.println("Failed to fetch public rooms: " + e.getMessage());
+        }
+        return rooms;
+    }
+    public static String getUserRole(String username) {
+        String sql = "SELECT role FROM users WHERE username = ?";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, username);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getString("role") : "CLIENT";
+            }
+        } catch (SQLException e) {
+            System.err.println("Failed to fetch user role: " + e.getMessage());
+            return "CLIENT";
+        }
+    }
+    public static List<String> getDrawCommandsForSession(int sessionId) {
+        List<String> commands = new ArrayList<>();
+        // Fetch only drawing commands, ordered by time, excluding heartbeat/control packets
+        String sql = "SELECT cmd_type, x1, y1, x2, y2, color_hex, stroke_width " +
+                "FROM draw_commands WHERE session_id = ? AND cmd_type NOT IN ('PING','PONG','SYNC') " +
+                "ORDER BY executed_at ASC";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, sessionId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    String cmd = rs.getString("cmd_type") + "|" +
+                            rs.getDouble("x1") + "|" + rs.getDouble("y1") + "|" +
+                            rs.getDouble("x2") + "|" + rs.getDouble("y2") + "|" +
+                            rs.getString("color_hex") + "|" + rs.getFloat("stroke_width");
+                    commands.add(cmd);
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Failed to load drawing history: " + e.getMessage());
+        }
+        return commands;
+    }
+    /**
+     * Validates room password against active sessions in MySQL.
+     * Returns true if password matches, or if room is public.
+     */
+    public static boolean validateRoomPassword(String hostIP, int socketPort, String password) {
+        String sql = "SELECT password_hash FROM rooms WHERE host_ip = ? AND socket_port = ? AND is_active = TRUE ORDER BY id DESC  LIMIT 1";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, hostIP);
+            ps.setInt(2, socketPort);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    String stored = rs.getString("password_hash");
+                    // If stored is null, it's a public room (bypass validation)
+                    if (stored == null) return true;
+                    // Plaintext comparison for demo (use BCrypt in production)
+                    return stored.equals(password);
+                }
+                return false; // Room not found or inactive
+            }
+        } catch (SQLException e) {
+            System.err.println("❌ DB Password Validation Error: " + e.getMessage());
+            return false;
+        }
+    }
     public static void main(String[] args) {
         DatabaseManager  dm = new DatabaseManager();
         System.out.println(dm.authenticate("client_user","client123"));

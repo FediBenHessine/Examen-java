@@ -1,6 +1,5 @@
 package Network;
 
-
 import javax.swing.*;
 import java.io.*;
 import java.net.*;
@@ -25,12 +24,15 @@ public class SocketClient {
     public boolean connect(String hostIP, int port) {
         try {
             socket = new Socket(hostIP, port);
+            socket.setTcpNoDelay(true);
             socket.setKeepAlive(true);
+
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             out = new PrintWriter(socket.getOutputStream(), true);
-            running = true;
 
+            running = true;
             if (onConnected != null) SwingUtilities.invokeLater(onConnected);
+
             new Thread(this::readLoop, "Client-Reader").start();
             new Thread(this::writeLoop, "Client-Writer").start();
             return true;
@@ -45,15 +47,16 @@ public class SocketClient {
             String line;
             while (running && (line = in.readLine()) != null) {
                 String cmd = line.trim();
+                if (cmd.isEmpty()) continue;
+                System.out.println("📥 Client read: [" + cmd + "]");
                 if (onCommandReceived != null) {
                     SwingUtilities.invokeLater(() -> onCommandReceived.accept(cmd));
                 }
             }
         } catch (IOException e) {
-            System.out.println("🔌 Disconnected from Server");
+            System.out.println("🔌 Client read loop ended: " + e.getMessage());
         } finally {
-            running = false;
-            if (onDisconnected != null) SwingUtilities.invokeLater(onDisconnected);
+            cleanup();
         }
     }
 
@@ -61,11 +64,26 @@ public class SocketClient {
         try {
             while (running) {
                 String cmd = outgoingQueue.take();
-                if (out != null && !out.checkError()) out.println(cmd);
+                if (out != null) {
+                    out.println(cmd);
+                    out.flush(); // ✅ CRITICAL: Force network transmission
+                    System.out.println("📤 Client wrote: [" + cmd + "]");
+                }
             }
-        } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
-    public void send(String command) { outgoingQueue.offer(command); }
-    public void shutdown() { running = false; try { if(socket != null) socket.close(); } catch(IOException ignored){} }
+    public void send(String command) {
+        if (running && !socket.isClosed()) outgoingQueue.offer(command);
+    }
+
+    private void cleanup() {
+        running = false;
+        if (onDisconnected != null) SwingUtilities.invokeLater(onDisconnected);
+        try { if (socket != null && !socket.isClosed()) socket.close(); } catch (IOException ignored) {}
+    }
+
+    public void shutdown() { cleanup(); }
 }
