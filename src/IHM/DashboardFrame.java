@@ -234,30 +234,56 @@ public class DashboardFrame extends JFrame {
         });
 
         btnDirect.addActionListener(e -> {
+            // ✅ Step 1: Get IP address
             String ip = JOptionPane.showInputDialog(dialog, "Host IP Address:", NetworkUtils.getLocalIP());
             if (ip == null || ip.trim().isEmpty()) return;
-            String roomName = JOptionPane.showInputDialog(dialog, "Room Name:");
-            if (roomName == null || roomName.trim().isEmpty()) return;
-            String password = null;
-            if (JOptionPane.showConfirmDialog(dialog, "Does this room require a password?", "Private Room",
-                    JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION) {
-                password = JOptionPane.showInputDialog(dialog, "Password:");
-                if (password == null) return;
-            }
 
-            final String finalIP = ip;
-            final String finalRoomName = roomName;
-            final String finalPassword = password;
+            final String finalIP = ip.trim();
+
+            // ✅ Step 2: Check if room exists at this IP
+            dialog.setEnabled(false);
+            statusLabel.setText(" Status: 🔍 Looking for room at " + finalIP + "...");
 
             new Thread(() -> {
-                boolean accepted = udpDiscovery.requestJoin(finalIP.trim(), finalRoomName.trim(), finalPassword);
+                RoomInfo room = DatabaseManager.getRoomByIP(finalIP);
                 SwingUtilities.invokeLater(() -> {
-                    if (accepted) {
-                        RoomInfo info = new RoomInfo(finalRoomName, "Direct", finalIP, 8083, RoomType.PRIVATE, finalPassword != null);
-                        attemptJoin(info, dialog);
-                    } else {
-                        JOptionPane.showMessageDialog(dialog, "❌ Join request denied", "Error", JOptionPane.ERROR_MESSAGE);
+                    dialog.setEnabled(true);
+                    if (room == null) {
+                        JOptionPane.showMessageDialog(dialog,
+                                "❌ No active room found at IP: " + finalIP + "\n\nMake sure:\n• The host is running\n• The IP address is correct\n• The room hasn't been closed",
+                                "Room Not Found", JOptionPane.ERROR_MESSAGE);
+                        statusLabel.setText(" Status: Ready");
+                        return;
                     }
+
+                    // ✅ Step 3: Ask for password directly (no room name or confirmation needed)
+                    String password = JOptionPane.showInputDialog(dialog,
+                            "🔐 Enter password for '" + room.roomName + "'\nHost: " + room.hostUsername,
+                            "Join Private Room", JOptionPane.QUESTION_MESSAGE);
+                    if (password == null) {
+                        statusLabel.setText(" Status: Ready");
+                        return; // User cancelled
+                    }
+
+                    // ✅ Step 4: Validate password and join
+                    dialog.setEnabled(false);
+                    statusLabel.setText(" Status: 🔐 Verifying password...");
+
+                    new Thread(() -> {
+                        boolean isValid = DatabaseManager.validateRoomPassword(room.hostIP, room.socketPort, password);
+                        SwingUtilities.invokeLater(() -> {
+                            dialog.setEnabled(true);
+                            if (isValid) {
+                                statusLabel.setText(" Status: ✅ Access granted. Joining...");
+                                proceedToJoin(room, dialog);
+                            } else {
+                                JOptionPane.showMessageDialog(dialog,
+                                        "❌ Incorrect password.\nPlease try again.",
+                                        "Access Denied", JOptionPane.ERROR_MESSAGE);
+                                statusLabel.setText(" Status: Ready");
+                            }
+                        });
+                    }).start();
                 });
             }).start();
         });

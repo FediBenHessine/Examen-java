@@ -269,6 +269,36 @@ public class DatabaseManager {
             return false;
         }
     }
+    /**
+     * Get room info by host IP (for direct join)
+     * Returns null if no active room found at that IP
+     */
+    public static RoomInfo getRoomByIP(String hostIP) {
+        String sql = "SELECT r.*, u.username as host_username, rt.name as room_type " +
+                "FROM rooms r JOIN users u ON r.host_username = u.username " +
+                "JOIN room_types rt ON r.room_type_id = rt.id " +
+                "WHERE r.host_ip = ? AND r.is_active = TRUE ORDER BY r.id DESC LIMIT 1";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, hostIP);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    Model.RoomType type = Model.RoomType.valueOf(rs.getString("room_type"));
+                    return new Model.RoomInfo(
+                            rs.getString("room_name"),
+                            rs.getString("host_username"),
+                            rs.getString("host_ip"),
+                            rs.getInt("socket_port"),
+                            type,
+                            type != Model.RoomType.PUBLIC // Requires password if not public
+                    );
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("❌ Failed to get room by IP: " + e.getMessage());
+        }
+        return null;
+    }
     public static void main(String[] args) {
         // Test authentication
         System.out.println("Testing authentication...");

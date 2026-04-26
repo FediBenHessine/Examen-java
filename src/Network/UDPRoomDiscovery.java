@@ -47,17 +47,22 @@ public class UDPRoomDiscovery {
                     System.out.println("📨 Received discovery request: " + request + " from " + packet.getAddress().getHostAddress());
                     
                     if ("DISCOVER_ROOMS".equals(request)) {
-                        // Build room info response
-                        RoomInfo info = new RoomInfo(roomName, username, hostIP, socketPort,
-                                roomType, roomType != Model.RoomType.PUBLIC && password != null);
-                        String response = "ROOM_FOUND|" + gson.toJson(info);
+                        // ✅ Only respond to discovery if room is not PRIVATE
+                        if (roomType != Model.RoomType.PRIVATE) {
+                            // Build room info response
+                            RoomInfo info = new RoomInfo(roomName, username, hostIP, socketPort,
+                                    roomType, roomType != Model.RoomType.PUBLIC && password != null);
+                            String response = "ROOM_FOUND|" + gson.toJson(info);
 
-                        // Send unicast response back to requester
-                        byte[] responseData = response.getBytes();
-                        DatagramPacket responsePacket = new DatagramPacket(
-                                responseData, responseData.length, packet.getAddress(), packet.getPort());
-                        socket.send(responsePacket);
-                        System.out.println("✅ Sent room info to " + packet.getAddress().getHostAddress());
+                            // Send unicast response back to requester
+                            byte[] responseData = response.getBytes();
+                            DatagramPacket responsePacket = new DatagramPacket(
+                                    responseData, responseData.length, packet.getAddress(), packet.getPort());
+                            socket.send(responsePacket);
+                            System.out.println("✅ Sent room info to " + packet.getAddress().getHostAddress());
+                        } else {
+                            System.out.println("🔒 Private room - not responding to discovery request from " + packet.getAddress().getHostAddress());
+                        }
                     } else if ("JOIN_REQUEST".equals(request.split("\\|")[0])) {
                         if (onDiscoveryRequest != null) {
                             onDiscoveryRequest.accept(packet.getAddress().getHostAddress());
