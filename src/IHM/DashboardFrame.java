@@ -16,15 +16,177 @@ import java.util.logging.Logger;
 import java.util.logging.Level;
 
 public class DashboardFrame extends JFrame {
+    // === JOIN FLOW ===
+    private void showJoinRoomDialog() {
+        if (joinDialogOpen) {
+            System.out.println("⚠️ Join dialog already open, ignoring request");
+            return;
+        }
+        joinDialogOpen = true;
+
+        JDialog dialog = new JDialog(this, "🔍 Join a Room", true);
+        dialog.setLayout(new BorderLayout(10, 10));
+        dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+
+        roomListModel.clear();
+        JList<RoomInfo> roomList = new JList<>(roomListModel);
+        roomList.setCellRenderer((list, value, index, isSelected, cellHasFocus) -> {
+            JLabel label = new JLabel("<html><b>" + value.roomName + "</b><br>" +
+                    "Host: " + value.hostUsername + " | " + value.roomType + "</html>");
+            label.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+            if (isSelected) label.setBackground(list.getSelectionBackground());
+            return label;
+        });
+
+        JPanel btnPanel = new JPanel(new FlowLayout());
+        JButton btnRefresh = new JButton("🔄 Refresh");
+        JButton btnJoin = new JButton("✅ Join Selected");
+        JButton btnDirect = new JButton("🔗 Direct Join (Private)");
+
+        final Timer[] discoveryTimer = new Timer[1];
+
+        final Runnable cleanup = () -> {
+            System.out.println("🧹 Cleaning up join dialog resources...");
+            if (discoveryTimer[0] != null && discoveryTimer[0].isRunning()) {
+                discoveryTimer[0].stop();
+                System.out.println("⏹️ Stopped periodic room discovery timer");
+            }
+            joinDialogOpen = false;
+            System.out.println("✅ Join dialog closed, flag reset");
+        };
+
+        btnRefresh.addActionListener(e -> discoverRoomsAsync());
+
+        btnJoin.addActionListener(e -> {
+            RoomInfo selected = roomList.getSelectedValue();
+            if (selected == null) {
+                JOptionPane.showMessageDialog(dialog, "Please select a room", "Info", JOptionPane.INFORMATION_MESSAGE);
+                return;
+            }
+            attemptJoin(selected, dialog);
+        });
+
+        btnDirect.addActionListener(e -> {
+            String ip = JOptionPane.showInputDialog(dialog, "Host IP Address:", NetworkUtils.getLocalIP());
+            if (ip == null || ip.trim().isEmpty()) return;
+            final String finalIP = ip.trim();
+
+            dialog.setEnabled(false);
+            statusLabel.setText(" Status: 🔍 Looking for room at " + finalIP + "...");
+
+            new Thread(() -> {
+                RoomInfo room = DatabaseManager.getRoomByIP(finalIP);
+                SwingUtilities.invokeLater(() -> {
+                    dialog.setEnabled(true);
+                    if (room == null) {
+                        JOptionPane.showMessageDialog(dialog,
+                                "❌ No active room found at IP: " + finalIP,
+                                "Room Not Found", JOptionPane.ERROR_MESSAGE);
+                        statusLabel.setText(" Status: Ready");
+                        return;
+                    }
+                    String password = JOptionPane.showInputDialog(dialog,
+                            "🔐 Enter password for '" + room.roomName + "'",
+                            "Join Private Room", JOptionPane.QUESTION_MESSAGE);
+                    if (password == null) {
+                        statusLabel.setText(" Status: Ready");
+                        return;
+                    }
+                    dialog.setEnabled(false);
+                    statusLabel.setText(" Status: 🔐 Verifying password...");
+                    new Thread(() -> {
+                        boolean isValid = DatabaseManager.validateRoomPassword(room.hostIP, room.socketPort, password);
+                        SwingUtilities.invokeLater(() -> {
+                            dialog.setEnabled(true);
+                            if (isValid) {
+                                statusLabel.setText(" Status: ✅ Access granted. Joining...");
+                                proceedToJoin(room, dialog);
+                            } else {
+                                JOptionPane.showMessageDialog(dialog, "❌ Incorrect password.",
+                                        "Access Denied", JOptionPane.ERROR_MESSAGE);
+                                statusLabel.setText(" Status: Ready");
+                            }
+                        });
+                    }).start();
+                });
+            }).start();
+        });
+
+        btnPanel.add(btnRefresh);
+        btnPanel.add(btnJoin);
+        btnPanel.add(btnDirect);
+
+        JPanel infoPanel = new JPanel(new BorderLayout());
+        infoPanel.add(new JLabel("📡 Discovered Rooms:"), BorderLayout.NORTH);
+        infoPanel.add(new JScrollPane(roomList), BorderLayout.CENTER);
+
+        dialog.add(infoPanel, BorderLayout.CENTER);
+        dialog.add(btnPanel, BorderLayout.SOUTH);
+        dialog.setSize(500, 350);
+        dialog.setLocationRelativeTo(this);
+
+        // ✅ Window listener for cleanup on close
+        dialog.addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosed(java.awt.event.WindowEvent e) {
+                System.out.println("ℹ️ Join dialog windowClosed event triggered");
+                cleanup.run();
+            }
+            @Override
+            public void windowClosing(java.awt.event.WindowEvent e) {
+                System.out.println("ℹ️ Join dialog windowClosing event triggered");
+                cleanup.run();
+            }
+        });
+
+        // ✅ Create periodic discovery timer (every 10 seconds)
+        discoveryTimer[0] = new Timer(10000, e -> {
+            System.out.println("🔄 Periodic discovery triggered");
+            discoverRoomsAsync();
+        });
+        discoveryTimer[0].setRepeats(true);
+
+        // ✅ KEY FIX: Start timer AND initial discovery BEFORE showing dialog
+        statusLabel.setText(" Status: 🔍 Discovering rooms...");
+        discoveryTimer[0].start();
+        System.out.println("🔄 Started periodic room discovery timer (every 10 seconds)");
+        discoverRoomsAsync();  // Initial discovery
+
+        // ✅ NOW show the dialog (modal, so this blocks until closed)
+        System.out.println("📂 Opening join dialog...");
+        dialog.setVisible(true);
+        // ⚠️ Code here runs AFTER dialog closes - timer already stopped by cleanup
+    }    private void discoverRoomsAsync() {
+        // ✅ Prevent overlapping discoveries
+        if (discoveryInProgress) return;
+        discoveryInProgress = true;
+
+        statusLabel.setText(" Status: 🔍 Broadcasting...");
+        new Thread(() -> {
+            List<RoomInfo> rooms = udpDiscovery.discoverRooms();
+            SwingUtilities.invokeLater(() -> {
+                roomListModel.clear();
+                rooms.forEach(roomListModel::addElement);
+                statusLabel.setText(" Status: Found " + rooms.size() + " room(s)");
+                discoveryInProgress = false; // ✅ Allow new discoveries
+            });
+        }, "UDP-Discovery-Thread").start();
+    }
     private static final Logger LOGGER = Logger.getLogger(DashboardFrame.class.getName());
     private final String username;
     private final JLabel statusLabel;
     private UDPRoomDiscovery udpDiscovery;
-    private final DefaultListModel<RoomInfo> roomListModel;
 
+    private final DefaultListModel<RoomInfo> roomListModel;
     // ✅ CRITICAL: Keep socket references alive to prevent GC
     private Network.SocketServer hostSocketServer;
+
     private Network.SocketClient clientSocketClient;
+    // ✅ Prevent multiple simultaneous discoveries
+    private volatile boolean discoveryInProgress = false;
+    // ✅ Prevent multiple join dialogs
+
+    private volatile boolean joinDialogOpen = false;
 
     public DashboardFrame(String username) {
         this.username = username;
@@ -65,8 +227,8 @@ public class DashboardFrame extends JFrame {
         roomListModel = new DefaultListModel<>();
         udpDiscovery.setOnRoomDiscovered(roomListModel::addElement);
     }
-
     // === HOST FLOW ===
+
     private void showHostRoomDialog() {
         JDialog dialog = new JDialog(this, "🏠 Host a New Room", true);
         dialog.setLayout(new GridLayout(6, 2, 5, 5));
@@ -201,121 +363,7 @@ public class DashboardFrame extends JFrame {
         dialog.setLocationRelativeTo(this);
         dialog.setVisible(true);
     }
-
     // === JOIN FLOW ===
-    private void showJoinRoomDialog() {
-        JDialog dialog = new JDialog(this, "🔍 Join a Room", true);
-        dialog.setLayout(new BorderLayout(10, 10));
-
-        roomListModel.clear();
-        JList<RoomInfo> roomList = new JList<>(roomListModel);
-        roomList.setCellRenderer((list, value, index, isSelected, cellHasFocus) -> {
-            JLabel label = new JLabel("<html><b>" + value.roomName + "</b><br>" +
-                    "Host: " + value.hostUsername + " | " + value.roomType + "</html>");
-            label.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
-            if (isSelected) label.setBackground(list.getSelectionBackground());
-            return label;
-        });
-
-        JPanel btnPanel = new JPanel(new FlowLayout());
-        JButton btnRefresh = new JButton("🔄 Refresh");
-        JButton btnJoin = new JButton("✅ Join Selected");
-        JButton btnDirect = new JButton("🔗 Direct Join (Private)");
-
-        btnRefresh.addActionListener(e -> discoverRoomsAsync());
-
-        btnJoin.addActionListener(e -> {
-            RoomInfo selected = roomList.getSelectedValue();
-            if (selected == null) {
-                JOptionPane.showMessageDialog(dialog, "Please select a room", "Info", JOptionPane.INFORMATION_MESSAGE);
-                return;
-            }
-            attemptJoin(selected, dialog);
-        });
-
-        btnDirect.addActionListener(e -> {
-            // ✅ Step 1: Get IP address
-            String ip = JOptionPane.showInputDialog(dialog, "Host IP Address:", NetworkUtils.getLocalIP());
-            if (ip == null || ip.trim().isEmpty()) return;
-
-            final String finalIP = ip.trim();
-
-            // ✅ Step 2: Check if room exists at this IP
-            dialog.setEnabled(false);
-            statusLabel.setText(" Status: 🔍 Looking for room at " + finalIP + "...");
-
-            new Thread(() -> {
-                RoomInfo room = DatabaseManager.getRoomByIP(finalIP);
-                SwingUtilities.invokeLater(() -> {
-                    dialog.setEnabled(true);
-                    if (room == null) {
-                        JOptionPane.showMessageDialog(dialog,
-                                "❌ No active room found at IP: " + finalIP + "\n\nMake sure:\n• The host is running\n• The IP address is correct\n• The room hasn't been closed",
-                                "Room Not Found", JOptionPane.ERROR_MESSAGE);
-                        statusLabel.setText(" Status: Ready");
-                        return;
-                    }
-
-                    // ✅ Step 3: Ask for password directly (no room name or confirmation needed)
-                    String password = JOptionPane.showInputDialog(dialog,
-                            "🔐 Enter password for '" + room.roomName + "'\nHost: " + room.hostUsername,
-                            "Join Private Room", JOptionPane.QUESTION_MESSAGE);
-                    if (password == null) {
-                        statusLabel.setText(" Status: Ready");
-                        return; // User cancelled
-                    }
-
-                    // ✅ Step 4: Validate password and join
-                    dialog.setEnabled(false);
-                    statusLabel.setText(" Status: 🔐 Verifying password...");
-
-                    new Thread(() -> {
-                        boolean isValid = DatabaseManager.validateRoomPassword(room.hostIP, room.socketPort, password);
-                        SwingUtilities.invokeLater(() -> {
-                            dialog.setEnabled(true);
-                            if (isValid) {
-                                statusLabel.setText(" Status: ✅ Access granted. Joining...");
-                                proceedToJoin(room, dialog);
-                            } else {
-                                JOptionPane.showMessageDialog(dialog,
-                                        "❌ Incorrect password.\nPlease try again.",
-                                        "Access Denied", JOptionPane.ERROR_MESSAGE);
-                                statusLabel.setText(" Status: Ready");
-                            }
-                        });
-                    }).start();
-                });
-            }).start();
-        });
-
-        btnPanel.add(btnRefresh);
-        btnPanel.add(btnJoin);
-        btnPanel.add(btnDirect);
-
-        JPanel infoPanel = new JPanel(new BorderLayout());
-        infoPanel.add(new JLabel("📡 Discovered Rooms:"), BorderLayout.NORTH);
-        infoPanel.add(new JScrollPane(roomList), BorderLayout.CENTER);
-
-        dialog.add(infoPanel, BorderLayout.CENTER);
-        dialog.add(btnPanel, BorderLayout.SOUTH);
-        dialog.setSize(500, 350);
-        dialog.setLocationRelativeTo(this);
-        dialog.setVisible(true);
-
-        discoverRoomsAsync();
-    }
-
-    private void discoverRoomsAsync() {
-        statusLabel.setText(" Status: 🔍 Broadcasting...");
-        new Thread(() -> {
-            List<RoomInfo> rooms = udpDiscovery.discoverRooms();
-            SwingUtilities.invokeLater(() -> {
-                roomListModel.clear();
-                rooms.forEach(roomListModel::addElement);
-                statusLabel.setText(" Status: Found " + rooms.size() + " room(s)");
-            });
-        }, "UDP-Discovery-Thread").start();
-    }
 
     private void attemptJoin(RoomInfo room, JDialog parentDialog) {
         if (room.requiresPassword) {
