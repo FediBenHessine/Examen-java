@@ -59,13 +59,6 @@ public class WhiteboardFrame extends JFrame {
         JComboBox<String> sizeSelector = new JComboBox<>(new String[]{"1px", "2px", "3px", "5px", "8px", "12px"});
         sizeSelector.setSelectedIndex(1); // Default 2px
         
-        // ✅ Quick color buttons
-        JButton btnBlack = new JButton("⚫");
-        JButton btnRed = new JButton("🔴");
-        JButton btnBlue = new JButton("🔵");
-        JButton btnGreen = new JButton("🟢");
-        JButton btnYellow = new JButton("🟡");
-        JButton btnPurple = new JButton("🟣");
 
         // ✅ Event handlers - Undo/Redo
         btnUndo.addActionListener(e -> {
@@ -123,13 +116,6 @@ public class WhiteboardFrame extends JFrame {
             canvas.setToolSettings(canvas.getCurrentColor(), size);
         });
         
-        // Quick color buttons
-        btnBlack.addActionListener(e -> canvas.setToolSettings("#000000", canvas.getCurrentStrokeWidth()));
-        btnRed.addActionListener(e -> canvas.setToolSettings("#FF0000", canvas.getCurrentStrokeWidth()));
-        btnBlue.addActionListener(e -> canvas.setToolSettings("#0000FF", canvas.getCurrentStrokeWidth()));
-        btnGreen.addActionListener(e -> canvas.setToolSettings("#00FF00", canvas.getCurrentStrokeWidth()));
-        btnYellow.addActionListener(e -> canvas.setToolSettings("#FFFF00", canvas.getCurrentStrokeWidth()));
-        btnPurple.addActionListener(e -> canvas.setToolSettings("#800080", canvas.getCurrentStrokeWidth()));
 
         // ✅ Add components to toolbar
         toolbar.add(btnUndo); toolbar.add(btnRedo);
@@ -141,8 +127,7 @@ public class WhiteboardFrame extends JFrame {
         
         toolbar.add(btnColorPicker); toolbar.add(sizeSelector);
         toolbar.add(Box.createHorizontalStrut(10));
-        toolbar.add(btnBlack); toolbar.add(btnRed); toolbar.add(btnBlue); 
-        toolbar.add(btnGreen); toolbar.add(btnYellow); toolbar.add(btnPurple);
+
         toolbar.add(Box.createHorizontalStrut(20)); toolbar.add(btnClear);
 
         add(toolbar, BorderLayout.NORTH);
