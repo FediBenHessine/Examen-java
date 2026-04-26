@@ -19,9 +19,11 @@ public class WhiteboardFrame extends JFrame {
     private java.util.function.Consumer<String> networkSender;
     private JButton btnUndo;
     private JButton btnRedo;
+    private final String username; // ✅ NEW: Track username
 
     public WhiteboardFrame(boolean isHost, String username, int sessionId) {
         this.isHost = isHost;
+        this.username = username;
         this.sessionId = sessionId;
         setTitle("Whiteboard | " + (isHost ? "🏠 HOST" : "👤 CLIENT") + " | " + username);
         setSize(1000, 700);
@@ -29,6 +31,9 @@ public class WhiteboardFrame extends JFrame {
         setLocationRelativeTo(null);
 
         canvas = new CanvasPanel();
+        canvas.setCurrentUsername(username); // ✅ NEW: Set username in canvas
+        // ✅ FIX: Connect canvas to button updater
+        canvas.setOnHistoryChanged(this::updateUndoRedoButtons);
         statusLabel = new JLabel(" Status: Initializing...");
         statusLabel.setForeground(Color.GRAY);
 
@@ -40,9 +45,15 @@ public class WhiteboardFrame extends JFrame {
         btnUndo.setEnabled(false);
         btnRedo.setEnabled(false);
         
+        // ✅ NEW: Tool buttons
+        JButton btnLine = new JButton("📏 Line");
+        JButton btnPen = new JButton("✏️ Pen");
+        JButton btnErase = new JButton("🧹 Erase");
+        JButton btnDelete = new JButton("🗑️ Delete");
+        
         // ✅ Advanced color palette
         JButton btnColorPicker = new JButton("🎨 Color");
-        JButton btnClear = new JButton("🗑️ Clear");
+        JButton btnClear = new JButton("🧼 Clear Canvas");
         
         // ✅ Size selector
         JComboBox<String> sizeSelector = new JComboBox<>(new String[]{"1px", "2px", "3px", "5px", "8px", "12px"});
@@ -56,16 +67,39 @@ public class WhiteboardFrame extends JFrame {
         JButton btnYellow = new JButton("🟡");
         JButton btnPurple = new JButton("🟣");
 
-        // ✅ Event handlers
+        // ✅ Event handlers - Undo/Redo
         btnUndo.addActionListener(e -> {
             canvas.undo();
-            updateUndoRedoButtons();
+//            updateUndoRedoButtons();
         });
         btnRedo.addActionListener(e -> {
             canvas.redo();
-            updateUndoRedoButtons();
+//            updateUndoRedoButtons();
         });
         
+        // ✅ NEW: Tool selection buttons
+        btnLine.addActionListener(e -> {
+            canvas.setCurrentTool(DrawCommand.Type.LINE);
+            updateToolButtons(btnLine, new JButton[]{btnLine, btnPen, btnErase, btnDelete});
+            statusLabel.setText(" Tool: 📏 Line");
+        });
+        btnPen.addActionListener(e -> {
+            canvas.setCurrentTool(DrawCommand.Type.PEN);
+            updateToolButtons(btnPen, new JButton[]{btnLine, btnPen, btnErase, btnDelete});
+            statusLabel.setText(" Tool: ✏️ Pen (Freehand drawing)");
+        });
+        btnErase.addActionListener(e -> {
+            canvas.setCurrentTool(DrawCommand.Type.ERASER);
+            updateToolButtons(btnErase, new JButton[]{btnLine, btnPen, btnErase, btnDelete});
+            statusLabel.setText(" Tool: 🧹 Erase");
+        });
+        btnDelete.addActionListener(e -> {
+            canvas.setCurrentTool(DrawCommand.Type.DELETE);
+            updateToolButtons(btnDelete, new JButton[]{btnLine, btnPen, btnErase, btnDelete});
+            statusLabel.setText(" Tool: 🗑️ Delete (Click to remove strokes)");
+        });
+        
+        // ✅ Color and size controls
         btnColorPicker.addActionListener(e -> {
             Color selectedColor = JColorChooser.showDialog(this, "Choose Color", Color.decode(canvas.getCurrentColor()));
             if (selectedColor != null) {
@@ -76,8 +110,11 @@ public class WhiteboardFrame extends JFrame {
         });
         
         btnClear.addActionListener(e -> {
-            canvas.clearLocal();
-            canvas.emitLocalCommand("CLEAR");
+            int confirm = JOptionPane.showConfirmDialog(this, "Clear the entire canvas?", "Confirm", JOptionPane.YES_NO_OPTION);
+            if (confirm == JOptionPane.YES_OPTION) {
+                canvas.clearLocal();
+                canvas.emitLocalCommand("CLEAR");
+            }
         });
         
         sizeSelector.addActionListener(e -> {
@@ -97,6 +134,11 @@ public class WhiteboardFrame extends JFrame {
         // ✅ Add components to toolbar
         toolbar.add(btnUndo); toolbar.add(btnRedo);
         toolbar.add(Box.createHorizontalStrut(10));
+        
+        // ✅ NEW: Tool buttons section
+        toolbar.add(btnLine); toolbar.add(btnPen); toolbar.add(btnErase); toolbar.add(btnDelete);
+        toolbar.add(Box.createHorizontalStrut(10));
+        
         toolbar.add(btnColorPicker); toolbar.add(sizeSelector);
         toolbar.add(Box.createHorizontalStrut(10));
         toolbar.add(btnBlack); toolbar.add(btnRed); toolbar.add(btnBlue); 
@@ -106,6 +148,7 @@ public class WhiteboardFrame extends JFrame {
         add(toolbar, BorderLayout.NORTH);
         add(canvas, BorderLayout.CENTER);
         add(statusLabel, BorderLayout.SOUTH);
+        SwingUtilities.invokeLater(this::updateUndoRedoButtons);
 
         // ✅ FIX 1: Start heartbeat timer ONLY for clients
         if (!isHost) {
@@ -127,6 +170,21 @@ public class WhiteboardFrame extends JFrame {
                 // Cleanup handled by disposing
             }
         });
+
+    }
+
+    // ✅ NEW: Update tool button styles to show active tool
+    private void updateToolButtons(JButton activeBtn, JButton[] allBtns) {
+        for (JButton btn : allBtns) {
+            if (btn == activeBtn) {
+                btn.setBackground(new Color(100, 150, 200));
+                btn.setOpaque(true);
+                btn.setFocusPainted(false);
+            } else {
+                btn.setBackground(UIManager.getColor("Button.background"));
+                btn.setOpaque(false);
+            }
+        }
     }
 
     public CanvasPanel getCanvas() { return canvas; }
@@ -145,18 +203,23 @@ public class WhiteboardFrame extends JFrame {
         missedPongCount = 0;
     }
 
-    // ✅ FIX 3: Offload DB write to background thread
+    // ✅ FIX 3: Offload DB write to background thread + include username
     public void bindLocalDraw(java.util.function.Consumer<String> sender) {
+        // First set the network sender
         canvas.setOnLocalDraw(rawCmd -> {
+            // Then handle DB + forwarding
             if (isHost) {
                 new Thread(() -> {
                     try {
                         DrawCommand cmd = CommandProtocol.deserialize(rawCmd);
-                        DatabaseManager.insertDrawCommand(sessionId, cmd);
+                        if (cmd != null) {
+                            cmd.username = username;
+                            DatabaseManager.insertDrawCommand(sessionId, cmd);
+                        }
                     } catch (Exception ignored) {}
                 }, "DB-Writer").start();
             }
-            sender.accept(rawCmd);
+            sender.accept(rawCmd); // Forward to network
         });
     }
 
@@ -165,29 +228,30 @@ public class WhiteboardFrame extends JFrame {
             if (networkSender != null) networkSender.accept("PONG");
             return;
         }
-        if ("PONG".equals(rawCmd)) {
-            setAlive(true);
-            return;
-        }
-        // ✅ NEW: Host disconnects → close client whiteboard
+        if ("PONG".equals(rawCmd)) { setAlive(true); return; }
         if ("HOST_CLOSED".equals(rawCmd)) {
             SwingUtilities.invokeLater(() -> {
-                JOptionPane.showMessageDialog(this,
-                        "🚪 Host has closed the session.\nYour whiteboard will now close.",
-                        "Session Ended", JOptionPane.INFORMATION_MESSAGE);
-                dispose(); // Closes the window cleanly
+                JOptionPane.showMessageDialog(this, "🚪 Host closed session", "Session Ended", JOptionPane.INFORMATION_MESSAGE);
+                dispose();
             });
             return;
         }
         if ("CLEAR".equals(rawCmd)) { canvas.clearLocal(); return; }
+
         canvas.addRemoteCommand(rawCmd);
+        // Buttons auto-update via onHistoryChanged listener
     }
 
     // ✅ Update undo/redo button states
     private void updateUndoRedoButtons() {
-        SwingUtilities.invokeLater(() -> {
+        if (SwingUtilities.isEventDispatchThread()) {
             btnUndo.setEnabled(canvas.canUndo());
             btnRedo.setEnabled(canvas.canRedo());
-        });
+        } else {
+            SwingUtilities.invokeLater(() -> {
+                btnUndo.setEnabled(canvas.canUndo());
+                btnRedo.setEnabled(canvas.canRedo());
+            });
+        }
     }
 }

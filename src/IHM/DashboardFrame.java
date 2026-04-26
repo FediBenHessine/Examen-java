@@ -323,8 +323,8 @@ public class DashboardFrame extends JFrame {
                         server.setOnClientDisconnected(() -> frame.setAlive(false));
                         server.setOnCommandReceived(frame::handleNetworkCommand);
 
-                        frame.bindLocalDraw(server::broadcast); // ✅ Use broadcast instead of send
                         frame.bindNetworkSender(server::broadcast);
+                        frame.bindLocalDraw(server::broadcast); // ✅ Use broadcast instead of send
 
                         server.start(finalPort);
                         statusLabel.setText(" Status: 🟢 Hosting '" + finalRoomName + "' on " + localIP + ":" + finalPort);

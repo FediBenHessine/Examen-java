@@ -74,8 +74,8 @@ public class DatabaseManager {
         if (sessionId <= 0 || cmd == null || cmd.type == null) return;
 
         String sql = "INSERT INTO draw_commands " +
-                "(session_id, cmd_type, x1, y1, x2, y2, color_hex, stroke_width, tool_name) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                "(session_id, cmd_type, x1, y1, x2, y2, color_hex, stroke_width, tool_name, username) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         try (Connection conn = getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -99,6 +99,8 @@ public class DatabaseManager {
                 ps.setFloat(8, (float) cmd.strokeWidth);
                 ps.setString(9, cmd.tool);
             }
+            // ✅ NEW: Insert username
+            ps.setString(10, cmd.username != null ? cmd.username : "UNKNOWN");
 
             ps.executeUpdate();
         } catch (SQLException e) {
@@ -224,7 +226,7 @@ public class DatabaseManager {
     public static List<String> getDrawCommandsForSession(int sessionId) {
         List<String> commands = new ArrayList<>();
         // Fetch only drawing commands, ordered by time, excluding heartbeat/control packets
-        String sql = "SELECT cmd_type, x1, y1, x2, y2, color_hex, stroke_width " +
+        String sql = "SELECT cmd_type, x1, y1, x2, y2, color_hex, stroke_width, username " +
                 "FROM draw_commands WHERE session_id = ? AND cmd_type NOT IN ('PING','PONG','SYNC') " +
                 "ORDER BY executed_at ASC";
         try (Connection conn = getConnection();
@@ -232,10 +234,13 @@ public class DatabaseManager {
             ps.setInt(1, sessionId);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
+                    // ✅ NEW: Include username in synchronized commands
+                    String username = rs.getString("username");
+                    if (username == null) username = "UNKNOWN";
                     String cmd = rs.getString("cmd_type") + "|" +
                             rs.getDouble("x1") + "|" + rs.getDouble("y1") + "|" +
                             rs.getDouble("x2") + "|" + rs.getDouble("y2") + "|" +
-                            rs.getString("color_hex") + "|" + rs.getFloat("stroke_width");
+                            rs.getString("color_hex") + "|" + rs.getFloat("stroke_width") + "|" + username;
                     commands.add(cmd);
                 }
             }

@@ -4,9 +4,21 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="42cf3cba-c83a-40c9-86ee-709d12ffb7e9" name="Changes" comment="Private rooms now does not appear in room discovery, and fixed private rooms joining workflow">
+    <list default="true" id="42cf3cba-c83a-40c9-86ee-709d12ffb7e9" name="Changes" comment="Implement join room dialog with direct join and room discovery features">
+      <change afterPath="$PROJECT_DIR$/DATABASE_MIGRATION.sql" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/FEATURES_DRAWING_TOOLS.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/IMPLEMENTATION_COMPLETE.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/IMPLEMENTATION_SUMMARY.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/QUICK_START.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/SETUP_INSTRUCTIONS.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/UI_VISUAL_GUIDE.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/Database/DatabaseManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/Database/DatabaseManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/IHM/CanvasPanel.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/IHM/CanvasPanel.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/IHM/DashboardFrame.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/IHM/DashboardFrame.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/IHM/WhiteboardFrame.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/IHM/WhiteboardFrame.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/Model/DrawCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/Model/DrawCommand.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/Network/CommandProtocol.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/Network/CommandProtocol.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -112,7 +124,15 @@
       <option name="project" value="LOCAL" />
       <updated>1777209174958</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="Implement join room dialog with direct join and room discovery features">
+      <option name="closed" value="true" />
+      <created>1777211877463</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1777211877463</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -129,7 +149,8 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Working Sign up" />
     <MESSAGE value="Private rooms now does not appear in room discovery, and fixed private rooms joining workflow" />
-    <option name="LAST_COMMIT_MESSAGE" value="Private rooms now does not appear in room discovery, and fixed private rooms joining workflow" />
+    <MESSAGE value="Implement join room dialog with direct join and room discovery features" />
+    <option name="LAST_COMMIT_MESSAGE" value="Implement join room dialog with direct join and room discovery features" />
   </component>
   <component name="github-copilot-workspace">
     <instructionFileLocations>
