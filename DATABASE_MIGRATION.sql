@@ -19,6 +19,8 @@ UPDATE draw_commands
 SET username = 'SYSTEM'
 WHERE username = 'UNKNOWN' AND cmd_type NOT IN ('UNDO', 'REDO', 'DELETE');
 
+
+ALTER TABLE draw_commands ADD COLUMN IF NOT EXISTS payload TEXT;
 -- ============================================
 -- VERIFICATION QUERIES
 -- ============================================
