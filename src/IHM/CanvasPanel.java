@@ -13,18 +13,21 @@ public class CanvasPanel extends JPanel {
     private final List<DrawCommand> history = new ArrayList<>();
     private final Stack<List<DrawCommand>> undoStack = new Stack<>();
     private final Stack<List<DrawCommand>> redoStack = new Stack<>();
-
     private DrawCommand currentStroke = null;
     private List<Point> penPath = null;
-    private List<Point> eraserPath = null;  // ✅ Track eraser path
-
+    private List<Point> eraserPath = null; // ✅ NEW: Store eraser path
     private Consumer<String> onLocalDraw;
-    private Runnable onHistoryChanged;  // ✅ Notify when history changes
-
+    private Runnable onHistoryChanged;
     private String currentColor = "#000000";
     private float currentStrokeWidth = 2.0f;
     private String currentUsername = "UNKNOWN";
     private DrawCommand.Type currentTool = DrawCommand.Type.LINE;
+
+    private boolean isInitialSync = false;
+    private List<String> pendingSyncCommands = new ArrayList<>(); // Raw strings, not DrawCommand
+    private Timer syncAnimationTimer;
+    private static final int SYNC_DELAY_MS = 1000; // Faster animation
+    private boolean isReplayingSync = false; // Prevent infinite loop during replay
 
     public CanvasPanel() {
         setBackground(Color.WHITE);
@@ -261,82 +264,47 @@ public class CanvasPanel extends JPanel {
 
     // ✅ Process remote commands - SYNC ALL ACTIONS
     public void addRemoteCommand(String rawCmd) {
-        if ("CLEAR".equals(rawCmd)) {
-            saveUndoState();
-            history.clear();
-            repaint();
-            notifyHistoryChanged();
+        if (isInitialSync && !isReplayingSync) {
+            // Queue for animated replay during initial sync
+            addToSyncAnimation(rawCmd);
             return;
         }
-        if ("PING".equals(rawCmd) || "PONG".equals(rawCmd)) return;
+        // Normal operation: process immediately
+        addRemoteCommandInternal(rawCmd, false);
+    }
 
+    private void draw(Graphics2D g2, DrawCommand c) {
+        // ✅ Safe color decoding with fallback
+        Color drawColor;
         try {
-            DrawCommand cmd = CommandProtocol.deserialize(rawCmd);
-            if (cmd == null) return;
-
-            // ✅ SYNC: Process remote UNDO
-            if (cmd.type == DrawCommand.Type.UNDO) {
-                if (!undoStack.isEmpty()) {
-                    redoStack.push(new ArrayList<>(history));
-                    history.clear();
-                    history.addAll(undoStack.pop());
-                    repaint();
-                    notifyHistoryChanged();
-                }
-                return;
+            String hex = c.colorHex;
+            if (hex == null || !hex.matches("^#[0-9A-Fa-f]{6}$")) {
+                drawColor = Color.BLACK; // Fallback for invalid colors
+            } else {
+                drawColor = Color.decode(hex);
             }
-
-            // ✅ SYNC: Process remote REDO
-            if (cmd.type == DrawCommand.Type.REDO) {
-                if (!redoStack.isEmpty()) {
-                    undoStack.push(new ArrayList<>(history));
-                    history.clear();
-                    history.addAll(redoStack.pop());
-                    repaint();
-                    notifyHistoryChanged();
-                }
-                return;
-            }
-
-            // ✅ SYNC: Process remote DELETE
-            if (cmd.type == DrawCommand.Type.DELETE) {
-                saveUndoState();
-                for (int i = history.size() - 1; i >= 0; i--) {
-                    if (isPointNearStroke(new Point((int)cmd.x1, (int)cmd.y1), history.get(i))) {
-                        history.remove(i);
-                        break;
-                    }
-                }
-                repaint();
-                notifyHistoryChanged();
-                return;
-            }
-
-            // ✅ SYNC: Process remote ERASE_PATH
-            if (cmd.type == DrawCommand.Type.ERASE_PATH) {
-                saveUndoState();
-                List<Point> erasePath = deserializePath(cmd.payload);
-                double radius = Math.max(cmd.strokeWidth, 10.0) / 2;
-                List<DrawCommand> toRemove = new ArrayList<>();
-                for (DrawCommand hc : history) {
-                    if (isStrokeIntersectingPath(hc, erasePath, radius)) {
-                        toRemove.add(hc);
-                    }
-                }
-                history.removeAll(toRemove);
-                repaint();
-                notifyHistoryChanged();
-                return;
-            }
-
-            // ✅ Normal drawing commands
-            history.add(cmd);
-            repaint();
-            notifyHistoryChanged();
-
         } catch (Exception e) {
-            System.err.println("❌ Invalid remote cmd: " + rawCmd);
+            System.err.println("⚠️ Color decode failed for: " + c.colorHex + ", using black");
+            drawColor = Color.BLACK;
         }
+
+        if (c.type == DrawCommand.Type.LINE || c.type == DrawCommand.Type.ERASER) {
+            g2.setColor(c.type == DrawCommand.Type.ERASER ? Color.WHITE : drawColor);
+            g2.setStroke(new BasicStroke(c.strokeWidth > 0 ? c.strokeWidth : 2.0f,
+                    BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            g2.drawLine((int)c.x1, (int)c.y1, (int)c.x2, (int)c.y2);
+
+        } else if (c.type == DrawCommand.Type.PEN) {
+            g2.setColor(drawColor);
+            g2.setStroke(new BasicStroke(c.strokeWidth > 0 ? c.strokeWidth : 2.0f,
+                    BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            List<Point> path = deserializePath(c.payload);
+            for (int i = 1; i < path.size(); i++) {
+                Point p1 = path.get(i-1), p2 = path.get(i);
+                g2.drawLine(p1.x, p1.y, p2.x, p2.y);
+            }
+        }
+        // ERASE_PATH doesn't draw - it removes strokes
     }
 
     @Override protected void paintComponent(Graphics g) {
@@ -356,23 +324,6 @@ public class CanvasPanel extends JPanel {
                 g2.drawLine(p1.x, p1.y, p2.x, p2.y);
             }
         }
-    }
-
-    private void draw(Graphics2D g2, DrawCommand c) {
-        if (c.type == DrawCommand.Type.LINE || c.type == DrawCommand.Type.ERASER) {
-            g2.setColor(c.type == DrawCommand.Type.ERASER ? Color.WHITE : Color.decode(c.colorHex));
-            g2.setStroke(new BasicStroke(c.strokeWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-            g2.drawLine((int)c.x1, (int)c.y1, (int)c.x2, (int)c.y2);
-        } else if (c.type == DrawCommand.Type.PEN) {
-            g2.setColor(Color.decode(c.colorHex));
-            g2.setStroke(new BasicStroke(c.strokeWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-            List<Point> path = deserializePath(c.payload);
-            for (int i = 1; i < path.size(); i++) {
-                Point p1 = path.get(i-1), p2 = path.get(i);
-                g2.drawLine(p1.x, p1.y, p2.x, p2.y);
-            }
-        }
-        // ERASE_PATH doesn't draw - it removes strokes
     }
 
     public void clearLocal() {
@@ -407,4 +358,149 @@ public class CanvasPanel extends JPanel {
     public String getCurrentUsername() {
         return currentUsername;
     }
+
+    // ✅ NEW: Start initial sync animation
+    public void startInitialSync() {
+        isInitialSync = true;
+        isReplayingSync = false;
+        pendingSyncCommands.clear();
+        if (syncAnimationTimer != null) syncAnimationTimer.stop();
+        System.out.println("🎬 Starting initial sync animation...");
+    }
+
+    // ✅ NEW: End initial sync animation
+    public void endInitialSync() {
+        isInitialSync = false;
+        if (syncAnimationTimer != null) {
+            syncAnimationTimer.stop();
+            syncAnimationTimer = null;
+        }
+        // Replay any remaining commands instantly if timer stopped early
+        if (!pendingSyncCommands.isEmpty() && !isReplayingSync) {
+            isReplayingSync = true;
+            for (String cmd : pendingSyncCommands) {
+                // Replay through addRemoteCommand to handle ALL types
+                addRemoteCommandInternal(cmd, true);
+            }
+            pendingSyncCommands.clear();
+            isReplayingSync = false;
+            repaint();
+            notifyHistoryChanged();
+        }
+        System.out.println("✅ Initial sync animation complete - canvas matches host");
+    }
+
+    // ✅ NEW: Add command to animation queue
+    private void addToSyncAnimation(String rawCmd) {
+        if (!isInitialSync) {
+            // Not in sync mode, process normally
+            addRemoteCommandInternal(rawCmd, false);
+            return;
+        }
+        // Queue raw command for animated replay
+        pendingSyncCommands.add(rawCmd);
+
+        // Start animation timer if not running
+        if (syncAnimationTimer == null && !isReplayingSync) {syncAnimationTimer = new Timer(SYNC_DELAY_MS, e -> animateNextSyncCommand());
+            syncAnimationTimer.setRepeats(true);
+            syncAnimationTimer.start();
+            System.out.println("⏱️ Sync animation timer started");
+        }
+    }
+
+    // ✅ NEW: Animate next command in sync queue
+    private void animateNextSyncCommand() {
+        if (pendingSyncCommands.isEmpty()) {
+            if (syncAnimationTimer != null) {
+                syncAnimationTimer.stop();
+                syncAnimationTimer = null;
+            }
+            System.out.println("🎬 Sync animation queue empty");
+            return;
+        }
+
+        // Pop next raw command and replay it properly
+        String rawCmd = pendingSyncCommands.remove(0);
+
+        // Replay through internal method to avoid re-queuing
+        addRemoteCommandInternal(rawCmd, true);
+
+        // Progress debug
+        System.out.println("🎨 Sync: " + rawCmd.substring(0, Math.min(40, rawCmd.length())) +
+                "... (" + pendingSyncCommands.size() + " remaining)");
+    }
+    private void addRemoteCommandInternal(String rawCmd, boolean isSyncReplay) {
+        if ("CLEAR".equals(rawCmd)) {
+            if (!isSyncReplay) saveUndoState(); // Only save undo state for live commands
+            history.clear();
+            if (!isSyncReplay) { undoStack.clear(); redoStack.clear(); } // Clear stacks on live clear
+            repaint();
+            notifyHistoryChanged();
+            return;
+        }
+        if ("PING".equals(rawCmd) || "PONG".equals(rawCmd)) return;
+
+        try {
+            DrawCommand cmd = CommandProtocol.deserialize(rawCmd);
+            if (cmd == null) return;
+
+            // ✅ Handle ALL command types during sync replay
+            if (cmd.type == DrawCommand.Type.UNDO) {
+                if (!undoStack.isEmpty()) {
+                    redoStack.push(new ArrayList<>(history));
+                    history.clear();
+                    history.addAll(undoStack.pop());
+                    repaint();
+                    notifyHistoryChanged();
+                }
+                return;
+            }
+            if (cmd.type == DrawCommand.Type.REDO) {
+                if (!redoStack.isEmpty()) {
+                    undoStack.push(new ArrayList<>(history));
+                    history.clear();
+                    history.addAll(redoStack.pop());
+                    repaint();
+                    notifyHistoryChanged();
+                }
+                return;
+            }
+            if (cmd.type == DrawCommand.Type.DELETE) {
+                if (!isSyncReplay) saveUndoState();
+                for (int i = history.size() - 1; i >= 0; i--) {
+                    if (isPointNearStroke(new Point((int)cmd.x1, (int)cmd.y1), history.get(i))) {
+                        history.remove(i);
+                        break;
+                    }
+                }
+                repaint();
+                notifyHistoryChanged();
+                return;
+            }
+            if (cmd.type == DrawCommand.Type.ERASE_PATH) {
+                if (!isSyncReplay) saveUndoState();
+                List<Point> erasePath = deserializePath(cmd.payload);
+                double radius = Math.max(cmd.strokeWidth, 10.0) / 2;
+                List<DrawCommand> toRemove = new ArrayList<>();
+                for (DrawCommand hc : history) {
+                    if (isStrokeIntersectingPath(hc, erasePath, radius)) {
+                        toRemove.add(hc);
+                    }
+                }
+                history.removeAll(toRemove);
+                repaint();
+                notifyHistoryChanged();
+                return;
+            }
+
+            // ✅ Normal drawing commands
+            history.add(cmd);
+            repaint();
+            notifyHistoryChanged();
+
+        } catch (Exception e) {
+            System.err.println("❌ Sync replay failed: " + rawCmd + " | " + e.getMessage());
+        }
+    }
+
 }

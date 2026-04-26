@@ -4,9 +4,14 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="42cf3cba-c83a-40c9-86ee-709d12ffb7e9" name="Changes" comment="Remove quick color buttons from whiteboard toolbar">
+    <list default="true" id="42cf3cba-c83a-40c9-86ee-709d12ffb7e9" name="Changes" comment="Commented out undo/redo buttons">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/Database/DatabaseManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/Database/DatabaseManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/IHM/CanvasPanel.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/IHM/CanvasPanel.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/IHM/DashboardFrame.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/IHM/DashboardFrame.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/IHM/WhiteboardFrame.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/IHM/WhiteboardFrame.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/Model/DrawCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/Model/DrawCommand.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/Network/CommandProtocol.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/Network/CommandProtocol.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -136,7 +141,15 @@
       <option name="project" value="LOCAL" />
       <updated>1777219851204</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary="Commented out undo/redo buttons">
+      <option name="closed" value="true" />
+      <created>1777222169899</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1777222169899</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -156,7 +169,8 @@
     <MESSAGE value="Implement join room dialog with direct join and room discovery features" />
     <MESSAGE value="SafePoint, to do;&#10;remove buttons, remove undo / redo maybe" />
     <MESSAGE value="Remove quick color buttons from whiteboard toolbar" />
-    <option name="LAST_COMMIT_MESSAGE" value="Remove quick color buttons from whiteboard toolbar" />
+    <MESSAGE value="Commented out undo/redo buttons" />
+    <option name="LAST_COMMIT_MESSAGE" value="Commented out undo/redo buttons" />
   </component>
   <component name="github-copilot-workspace">
     <instructionFileLocations>

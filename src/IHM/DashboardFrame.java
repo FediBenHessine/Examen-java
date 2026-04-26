@@ -308,16 +308,25 @@ public class DashboardFrame extends JFrame {
 
                         Network.SocketServer server = new Network.SocketServer();
 
+                        // DashboardFrame.java - Inside host's setOnClientConnected callback:
+
                         server.setOnClientConnected(() -> {
                             frame.setAlive(true);
-                            // ✅ SYNC EXISTING DRAWINGS FROM DB TO NEW CLIENT
+
+                            // ✅ Send sync markers to client
+                            server.broadcast("SYNC_START");
+
                             System.out.println("📤 Syncing existing drawings to client...");
                             List<String> history = DatabaseManager.getDrawCommandsForSession(sessionId);
+
                             for (String cmd : history) {
+                                // Small delay between commands for smooth animation (optional)
+                                try { Thread.sleep(10); } catch (InterruptedException ignored) {}
                                 server.broadcast(cmd);
                             }
-                            server.broadcast("SYNC_COMPLETE");
-                            System.out.println("✅ Synced " + history.size() + " commands.");
+
+                            server.broadcast("SYNC_END");
+                            System.out.println("✅ Synced " + history.size() + " commands with animation markers");
                         });
 
                         server.setOnClientDisconnected(() -> frame.setAlive(false));

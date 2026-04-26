@@ -74,9 +74,8 @@ public class DatabaseManager {
         if (sessionId <= 0 || cmd == null || cmd.type == null) return;
 
         String sql = "INSERT INTO draw_commands " +
-                "(session_id, cmd_type, x1, y1, x2, y2, color_hex, stroke_width, tool_name, username) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-
+                "(session_id, cmd_type, x1, y1, x2, y2, color_hex, stroke_width, tool_name, username, payload) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try (Connection conn = getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, sessionId);
@@ -101,7 +100,7 @@ public class DatabaseManager {
             }
             // ✅ NEW: Insert username
             ps.setString(10, cmd.username != null ? cmd.username : "UNKNOWN");
-
+            ps.setString(11, cmd.payload);
             ps.executeUpdate();
         } catch (SQLException e) {
             System.err.println("DB insertDrawCommand Error: " + e.getMessage());
@@ -223,25 +222,46 @@ public class DatabaseManager {
             return "CLIENT";
         }
     }
+    // Database/DatabaseManager.java
+
     public static List<String> getDrawCommandsForSession(int sessionId) {
         List<String> commands = new ArrayList<>();
-        // Fetch only drawing commands, ordered by time, excluding heartbeat/control packets
-        String sql = "SELECT cmd_type, x1, y1, x2, y2, color_hex, stroke_width, username " +
-                "FROM draw_commands WHERE session_id = ? AND cmd_type NOT IN ('PING','PONG','SYNC') " +
+        String sql = "SELECT cmd_type, x1, y1, x2, y2, color_hex, stroke_width, username, payload " +
+                "FROM draw_commands WHERE session_id = ? AND cmd_type NOT IN ('PING','PONG') " +
                 "ORDER BY executed_at ASC";
         try (Connection conn = getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, sessionId);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    // ✅ NEW: Include username in synchronized commands
+                    String cmdType = rs.getString("cmd_type");
                     String username = rs.getString("username");
                     if (username == null) username = "UNKNOWN";
-                    String cmd = rs.getString("cmd_type") + "|" +
-                            rs.getDouble("x1") + "|" + rs.getDouble("y1") + "|" +
-                            rs.getDouble("x2") + "|" + rs.getDouble("y2") + "|" +
-                            rs.getString("color_hex") + "|" + rs.getFloat("stroke_width") + "|" + username;
-                    commands.add(cmd);
+
+                    // ✅ Output in NETWORK FORMAT: TYPE|username|data...
+                    if ("PEN".equals(cmdType) || "ERASE_PATH".equals(cmdType)) {
+                        String payload = rs.getString("payload");
+                        if (payload != null) payload = payload.replace("|", "%7C").replace(";", "%3B");
+                        String cmd = cmdType + "|" + username + "|" +
+                                (payload != null ? payload : "") + "|" +
+                                rs.getFloat("stroke_width") + "|" +
+                                (rs.getString("color_hex") != null ? rs.getString("color_hex") : "#000000");
+                        commands.add(cmd);
+                    } else if ("DELETE".equals(cmdType)) {
+                        String cmd = cmdType + "|" + username + "|" +
+                                rs.getDouble("x1") + "|" + rs.getDouble("y1");
+                        commands.add(cmd);
+                    } else if ("CLEAR".equals(cmdType) || "UNDO".equals(cmdType) || "REDO".equals(cmdType)) {
+                        commands.add(cmdType + "|" + username);
+                    } else {
+                        // LINE, ERASER, etc.
+                        String cmd = cmdType + "|" + username + "|" +
+                                rs.getDouble("x1") + "|" + rs.getDouble("y1") + "|" +
+                                rs.getDouble("x2") + "|" + rs.getDouble("y2") + "|" +
+                                (rs.getString("color_hex") != null ? rs.getString("color_hex") : "#000000") + "|" +
+                                rs.getFloat("stroke_width");
+                        commands.add(cmd);
+                    }
                 }
             }
         } catch (SQLException e) {

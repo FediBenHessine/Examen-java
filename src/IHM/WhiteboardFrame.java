@@ -20,6 +20,7 @@ public class WhiteboardFrame extends JFrame {
     private JButton btnUndo;
     private JButton btnRedo;
     private final String username; // ✅ NEW: Track username
+    private boolean syncStarted = false;
 
     public WhiteboardFrame(boolean isHost, String username, int sessionId) {
         this.isHost = isHost;
@@ -221,12 +222,28 @@ public class WhiteboardFrame extends JFrame {
             });
             return;
         }
+
+        // ✅ Detect SYNC_START command from host
+        if ("SYNC_START".equals(rawCmd)) {
+            System.out.println("🔄 Received SYNC_START - beginning animated sync");
+            syncStarted = true;
+            canvas.startInitialSync();
+            return;
+        }
+
+        // ✅ Detect SYNC_END command from host
+        if ("SYNC_END".equals(rawCmd)) {
+            System.out.println("✅ Received SYNC_END - finishing animated sync");
+            canvas.endInitialSync();
+            syncStarted = false;
+            return;
+        }
+
         if ("CLEAR".equals(rawCmd)) { canvas.clearLocal(); return; }
 
+        // All other commands go through canvas (which handles sync queuing)
         canvas.addRemoteCommand(rawCmd);
-        // Buttons auto-update via onHistoryChanged listener
     }
-
     // ✅ Update undo/redo button states
     private void updateUndoRedoButtons() {
         if (SwingUtilities.isEventDispatchThread()) {

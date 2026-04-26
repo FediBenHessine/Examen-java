@@ -31,6 +31,7 @@ public class DrawCommand  implements Serializable {
         cmd.username = username;
         cmd.payload = pathData;
         cmd.strokeWidth = eraserSize;
+        cmd.colorHex = "#FFFFFF"; // Irrelevant for erase, but set default
         return cmd;
     }
 }
