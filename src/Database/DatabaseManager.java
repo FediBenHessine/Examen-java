@@ -107,18 +107,37 @@ public class DatabaseManager {
     }
     // ✅ SIGNUP: Register new user
     public static boolean signUp(String username, String password, String role) {
-        if (userExists(username)) return false;
+        // Input validation
+        if (username == null || password == null || username.trim().isEmpty() || password.trim().isEmpty()) {
+            System.err.println("❌ Sign up failed: Username and password cannot be empty");
+            return false;
+        }
+
+        if (username.length() < 3 || password.length() < 6) {
+            System.err.println("❌ Sign up failed: Username must be >= 3 chars, password >= 6 chars");
+            return false;
+        }
+
+        // Check for existing user
+        if (userExists(username)) {
+            System.err.println("❌ Sign up failed: Username '" + username + "' already exists");
+            return false;
+        }
 
         // ⚠️ For demo: store plaintext. Use BCrypt in production!
-        String sql = "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)";
+        String sql = "INSERT INTO users (username, password_hash, role, created_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)";
         try (Connection conn = getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, username);
-            ps.setString(2, password); // TODO: hash with BCrypt
-            ps.setString(3, role);
-            return ps.executeUpdate() > 0;
+            ps.setString(1, username.trim());
+            ps.setString(2, password.trim()); // TODO: hash with BCrypt
+            ps.setString(3, role != null ? role : "CLIENT");
+            boolean success = ps.executeUpdate() > 0;
+            if (success) {
+                System.out.println("✅ User '" + username + "' registered successfully");
+            }
+            return success;
         } catch (SQLException e) {
-            System.err.println("Signup failed: " + e.getMessage());
+            System.err.println("❌ Signup failed for user '" + username + "': " + e.getMessage());
             return false;
         }
     }
@@ -251,7 +270,26 @@ public class DatabaseManager {
         }
     }
     public static void main(String[] args) {
-        DatabaseManager  dm = new DatabaseManager();
-        System.out.println(dm.authenticate("client_user","client123"));
+        // Test authentication
+        System.out.println("Testing authentication...");
+        System.out.println("client_user login: " + authenticate("client_user", "client123"));
+
+        // Test sign up
+        System.out.println("Testing sign up...");
+        boolean signup1 = signUp("testuser1", "password123", "USER");
+        System.out.println("Sign up testuser1: " + signup1);
+
+        boolean signup2 = signUp("testuser1", "password123", "USER"); // Should fail
+        System.out.println("Sign up duplicate testuser1: " + signup2);
+
+        // Test validation
+        boolean signup3 = signUp("", "password123", "USER"); // Should fail
+        System.out.println("Sign up empty username: " + signup3);
+
+        boolean signup4 = signUp("ab", "password123", "USER"); // Should fail
+        System.out.println("Sign up short username: " + signup4);
+
+        boolean signup5 = signUp("testuser2", "12345", "USER"); // Should fail
+        System.out.println("Sign up short password: " + signup5);
     }
 }
