@@ -118,7 +118,7 @@ public class WhiteboardFrame extends JFrame {
         
 
         // ✅ Add components to toolbar
-        toolbar.add(btnUndo); toolbar.add(btnRedo);
+//        toolbar.add(btnUndo); toolbar.add(btnRedo);
         toolbar.add(Box.createHorizontalStrut(10));
         
         // ✅ NEW: Tool buttons section
