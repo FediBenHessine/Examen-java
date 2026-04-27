@@ -99,6 +99,42 @@ public class UDPRoomDiscovery {
                             socket.send(responsePacket);
                             System.out.println("❌ Join request rejected for room '" + roomName + "' from " + packet.getAddress().getHostAddress());
                         }
+                    } else if ("DIRECT_JOIN".equals(request.split("\\|")[0])) {
+                        // Parse direct join request: DIRECT_JOIN|password
+                        String[] parts = request.split("\\|");
+                        String providedPassword = parts.length > 1 ? parts[1] : "";
+
+                        // Validate password against host's room
+                        boolean isValidJoin = false;
+                        if (roomType == Model.RoomType.PUBLIC) {
+                            // Public rooms don't require password
+                            isValidJoin = true;
+                        } else {
+                            // Password-protected rooms: validate against stored password
+                            isValidJoin = (password != null && password.equals(providedPassword));
+                        }
+
+                        if (isValidJoin) {
+                            if (onDiscoveryRequest != null) {
+                                onDiscoveryRequest.accept(packet.getAddress().getHostAddress());
+                            }
+                            // Send room info in response
+                            RoomInfo info = new RoomInfo(roomName, username, hostIP, socketPort,
+                                    roomType, roomType != Model.RoomType.PUBLIC && password != null);
+                            String response = "DIRECT_JOIN_ACCEPTED|" + gson.toJson(info);
+                            byte[] responseData = response.getBytes();
+                            DatagramPacket responsePacket = new DatagramPacket(
+                                    responseData, responseData.length, packet.getAddress(), packet.getPort());
+                            socket.send(responsePacket);
+                            System.out.println("✅ Direct join accepted for room '" + roomName + "' from " + packet.getAddress().getHostAddress());
+                        } else {
+                            // Send DIRECT_JOIN_REJECTED response
+                            byte[] responseData = "DIRECT_JOIN_REJECTED".getBytes();
+                            DatagramPacket responsePacket = new DatagramPacket(
+                                    responseData, responseData.length, packet.getAddress(), packet.getPort());
+                            socket.send(responsePacket);
+                            System.out.println("❌ Direct join rejected for room '" + roomName + "' from " + packet.getAddress().getHostAddress());
+                        }
                     }
                 }
             } catch (IOException e) {
@@ -203,6 +239,44 @@ public class UDPRoomDiscovery {
         } catch (IOException e) {
             System.err.println("❌ Join request failed: " + e.getMessage());
             return false;
+        }
+    }
+
+    // === CLIENT MODE: Direct join without knowing room name ===
+    public RoomInfo requestDirectJoin(String hostIP, String password) {
+        try {
+            socket = new DatagramSocket();
+            socket.setSoTimeout(2000);
+
+            String request = "DIRECT_JOIN|" + password;
+            byte[] requestData = request.getBytes();
+            DatagramPacket packet = new DatagramPacket(
+                    requestData, requestData.length,
+                    InetAddress.getByName(hostIP), DISCOVERY_PORT);
+            socket.send(packet);
+
+            // Wait for response
+            byte[] buffer = new byte[4096];
+            DatagramPacket response = new DatagramPacket(buffer, buffer.length);
+            socket.receive(response);
+
+            String result = new String(response.getData(), 0, response.getLength()).trim();
+            socket.close();
+            
+            if (result.startsWith("DIRECT_JOIN_ACCEPTED|")) {
+                // Parse room info from response
+                String json = result.substring("DIRECT_JOIN_ACCEPTED|".length());
+                return gson.fromJson(json, RoomInfo.class);
+            } else if ("DIRECT_JOIN_REJECTED".equals(result)) {
+                System.out.println("❌ Direct join request rejected by host");
+                return null;
+            } else {
+                System.err.println("❌ Unexpected response from host: " + result);
+                return null;
+            }
+        } catch (IOException e) {
+            System.err.println("❌ Direct join request failed: " + e.getMessage());
+            return null;
         }
     }
 

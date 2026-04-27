@@ -4,14 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="42cf3cba-c83a-40c9-86ee-709d12ffb7e9" name="Changes" comment="Refactor room join request handling to validate against room name and password">
+    <list default="true" id="42cf3cba-c83a-40c9-86ee-709d12ffb7e9" name="Changes" comment="Add remote database connection support and update draw command handling">
+      <change afterPath="$PROJECT_DIR$/.idea/copilotDiffState.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/Database/DatabaseConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/Database/DatabaseConfig.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/Database/DatabaseManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/Database/DatabaseManager.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/Database/Singleton.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/Database/Singleton.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/IHM/WhiteboardFrame.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/IHM/WhiteboardFrame.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/RMI/RemoteSession.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/RMI/RemoteSession.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/RMI/SessionImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/RMI/SessionImpl.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -117,7 +112,7 @@
       <updated>1777122675600</updated>
       <workItem from="1777283471085" duration="2675000" />
       <workItem from="1777286356822" duration="621000" />
-      <workItem from="1777299417046" duration="3165000" />
+      <workItem from="1777299417046" duration="4078000" />
     </task>
     <task id="LOCAL-00001" summary="Working Sign up">
       <option name="closed" value="true" />
@@ -199,7 +194,15 @@
       <option name="project" value="LOCAL" />
       <updated>1777301076296</updated>
     </task>
-    <option name="localTasksCounter" value="11" />
+    <task id="LOCAL-00011" summary="Add remote database connection support and update draw command handling">
+      <option name="closed" value="true" />
+      <created>1777302688233</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1777302688233</updated>
+    </task>
+    <option name="localTasksCounter" value="12" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -227,7 +230,8 @@
     <MESSAGE value="Add payload column to draw_commands table and update workspace configuration" />
     <MESSAGE value="Comment out user existence check in session initialization" />
     <MESSAGE value="Refactor room join request handling to validate against room name and password" />
-    <option name="LAST_COMMIT_MESSAGE" value="Refactor room join request handling to validate against room name and password" />
+    <MESSAGE value="Add remote database connection support and update draw command handling" />
+    <option name="LAST_COMMIT_MESSAGE" value="Add remote database connection support and update draw command handling" />
   </component>
   <component name="github-copilot-workspace">
     <instructionFileLocations>

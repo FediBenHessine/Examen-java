@@ -71,43 +71,31 @@ public class DashboardFrame extends JFrame {
             if (ip == null || ip.trim().isEmpty()) return;
             final String finalIP = ip.trim();
 
+            // Ask for password first (assuming direct join is for private rooms)
+            String password = JOptionPane.showInputDialog(dialog,
+                    "🔐 Enter password for direct join to " + finalIP,
+                    "Direct Join", JOptionPane.QUESTION_MESSAGE);
+            if (password == null) {
+                statusLabel.setText(" Status: Ready");
+                return;
+            }
+
             dialog.setEnabled(false);
-            statusLabel.setText(" Status: 🔍 Looking for room at " + finalIP + "...");
+            statusLabel.setText(" Status: 🔐 Verifying password...");
 
             new Thread(() -> {
-                RoomInfo room = DatabaseManager.getRoomByIP(finalIP);
+                RoomInfo room = udpDiscovery.requestDirectJoin(finalIP, password);
                 SwingUtilities.invokeLater(() -> {
                     dialog.setEnabled(true);
                     if (room == null) {
                         JOptionPane.showMessageDialog(dialog,
-                                "❌ No active room found at IP: " + finalIP,
-                                "Room Not Found", JOptionPane.ERROR_MESSAGE);
+                                "❌ Direct join failed.\nInvalid password or no room found at: " + finalIP,
+                                "Join Failed", JOptionPane.ERROR_MESSAGE);
                         statusLabel.setText(" Status: Ready");
                         return;
                     }
-                    String password = JOptionPane.showInputDialog(dialog,
-                            "🔐 Enter password for '" + room.roomName + "'",
-                            "Join Private Room", JOptionPane.QUESTION_MESSAGE);
-                    if (password == null) {
-                        statusLabel.setText(" Status: Ready");
-                        return;
-                    }
-                    dialog.setEnabled(false);
-                    statusLabel.setText(" Status: 🔐 Verifying password...");
-                    new Thread(() -> {
-                        boolean isValid = udpDiscovery.requestJoin(room.hostIP, room.roomName, password);
-                        SwingUtilities.invokeLater(() -> {
-                            dialog.setEnabled(true);
-                            if (isValid) {
-                                statusLabel.setText(" Status: ✅ Access granted. Joining...");
-                                proceedToJoin(room, dialog);
-                            } else {
-                                JOptionPane.showMessageDialog(dialog, "❌ Incorrect password.",
-                                        "Access Denied", JOptionPane.ERROR_MESSAGE);
-                                statusLabel.setText(" Status: Ready");
-                            }
-                        });
-                    }).start();
+                    statusLabel.setText(" Status: ✅ Access granted. Joining...");
+                    proceedToJoin(room, dialog);
                 });
             }).start();
         });
