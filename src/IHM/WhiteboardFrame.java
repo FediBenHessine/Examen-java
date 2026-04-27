@@ -22,59 +22,97 @@ public class WhiteboardFrame extends JFrame {
         this.isHost = isHost;
         this.username = username;
         this.sessionId = sessionId;
-        setTitle("Whiteboard | " + (isHost ? "🏠 HOST" : "👤 CLIENT") + " | " + username);
+        setTitle("Whiteboard - " + (isHost ? "Host" : "Client") + " - " + username);
         setSize(1000, 700);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLocationRelativeTo(null);
+        getContentPane().setBackground(Color.WHITE);
 
         canvas = new CanvasPanel();
         canvas.setCurrentUsername(username); // ✅ NEW: Set username in canvas
         // ✅ FIX: Connect canvas to button updater
-        statusLabel = new JLabel(" Status: Initializing...");
-        statusLabel.setForeground(Color.GRAY);
+        statusLabel = new JLabel("Status: Initializing...");
+        statusLabel.setForeground(Color.DARK_GRAY);
+        statusLabel.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
+        statusLabel.setBackground(Color.WHITE);
+        statusLabel.setOpaque(true);
+        statusLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
 
-        JPanel toolbar = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel toolbar = new JPanel();
+        toolbar.setLayout(new BoxLayout(toolbar, BoxLayout.X_AXIS));
+        toolbar.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
+        toolbar.setBackground(new Color(245, 245, 245));
 
-        
+        // Tool buttons panel
+        JPanel toolPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
+        toolPanel.setBackground(new Color(245, 245, 245));
+
         // ✅ NEW: Tool buttons
-        JButton btnLine = new JButton("📏 Line");
-        JButton btnPen = new JButton("✏️ Pen");
-        JButton btnErase = new JButton("🧹 Erase");
-        JButton btnDelete = new JButton("🗑️ Delete");
-        
+        JButton btnLine = createToolButton("Line");
+        JButton btnPen = createToolButton("Pen");
+        JButton btnErase = createToolButton("Erase");
+        JButton btnDelete = createToolButton("Delete");
+
+        // Settings panel
+        JPanel settingsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
+        settingsPanel.setBackground(new Color(245, 245, 245));
+
         // ✅ Advanced color palette
-        JButton btnColorPicker = new JButton("🎨 Color");
-        JButton btnClear = new JButton("🧼 Clear Canvas");
-        
+        JButton btnColorPicker = createToolButton("Color");
+        btnColorPicker.setBackground(Color.BLACK); // Default color
+        btnColorPicker.setForeground(Color.WHITE); // Ensure text is visible on black
+
         // ✅ Size selector
         JComboBox<String> sizeSelector = new JComboBox<>(new String[]{"1px", "2px", "3px", "5px", "8px", "12px"});
         sizeSelector.setSelectedIndex(1); // Default 2px
-        
+        sizeSelector.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        sizeSelector.setMaximumSize(new Dimension(60, 30));
 
+        // Actions panel
+        JPanel actionsPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 5));
+        actionsPanel.setBackground(new Color(245, 245, 245));
 
-        
+        JButton btnClear = createToolButton("Clear Canvas");
+
+        // Add to panels
+        toolPanel.add(btnLine);
+        toolPanel.add(btnPen);
+        toolPanel.add(btnErase);
+        toolPanel.add(btnDelete);
+
+        settingsPanel.add(btnColorPicker);
+        settingsPanel.add(sizeSelector);
+
+        actionsPanel.add(btnClear);
+
+        toolbar.add(toolPanel);
+        toolbar.add(Box.createHorizontalStrut(20));
+        toolbar.add(settingsPanel);
+        toolbar.add(Box.createHorizontalGlue());
+        toolbar.add(actionsPanel);
+
         // ✅ NEW: Tool selection buttons
         btnLine.addActionListener(e -> {
             canvas.setCurrentTool(DrawCommand.Type.LINE);
             updateToolButtons(btnLine, new JButton[]{btnLine, btnPen, btnErase, btnDelete});
-            statusLabel.setText(" Tool: 📏 Line");
+            statusLabel.setText("Tool: Line");
         });
         btnPen.addActionListener(e -> {
             canvas.setCurrentTool(DrawCommand.Type.PEN);
             updateToolButtons(btnPen, new JButton[]{btnLine, btnPen, btnErase, btnDelete});
-            statusLabel.setText(" Tool: ✏️ Pen (Freehand drawing)");
+            statusLabel.setText("Tool: Pen (Freehand drawing)");
         });
         btnErase.addActionListener(e -> {
             canvas.setCurrentTool(DrawCommand.Type.ERASER);
             updateToolButtons(btnErase, new JButton[]{btnLine, btnPen, btnErase, btnDelete});
-            statusLabel.setText(" Tool: 🧹 Erase");
+            statusLabel.setText("Tool: Erase");
         });
         btnDelete.addActionListener(e -> {
             canvas.setCurrentTool(DrawCommand.Type.DELETE);
             updateToolButtons(btnDelete, new JButton[]{btnLine, btnPen, btnErase, btnDelete});
-            statusLabel.setText(" Tool: 🗑️ Delete (Click to remove strokes)");
+            statusLabel.setText("Tool: Delete (Click to remove strokes)");
         });
-        
+
         // ✅ Color and size controls
         btnColorPicker.addActionListener(e -> {
             Color selectedColor = JColorChooser.showDialog(this, "Choose Color", Color.decode(canvas.getCurrentColor()));
@@ -82,9 +120,15 @@ public class WhiteboardFrame extends JFrame {
                 String hex = String.format("#%02x%02x%02x", selectedColor.getRed(), selectedColor.getGreen(), selectedColor.getBlue());
                 canvas.setToolSettings(hex, canvas.getCurrentStrokeWidth());
                 btnColorPicker.setBackground(selectedColor);
+                // Adjust text color for contrast
+                int r = selectedColor.getRed();
+                int g = selectedColor.getGreen();
+                int b = selectedColor.getBlue();
+                double luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+                btnColorPicker.setForeground(luminance > 128 ? Color.BLACK : Color.WHITE);
             }
         });
-        
+
         btnClear.addActionListener(e -> {
             int confirm = JOptionPane.showConfirmDialog(this, "Clear the entire canvas?", "Confirm", JOptionPane.YES_NO_OPTION);
             if (confirm == JOptionPane.YES_OPTION) {
@@ -92,26 +136,12 @@ public class WhiteboardFrame extends JFrame {
                 canvas.emitLocalCommand("CLEAR");
             }
         });
-        
+
         sizeSelector.addActionListener(e -> {
             String selected = (String) sizeSelector.getSelectedItem();
             float size = Float.parseFloat(selected.replace("px", ""));
             canvas.setToolSettings(canvas.getCurrentColor(), size);
         });
-        
-
-        // ✅ Add components to toolbar
-//        toolbar.add(btnUndo); toolbar.add(btnRedo);
-        toolbar.add(Box.createHorizontalStrut(10));
-        
-        // ✅ NEW: Tool buttons section
-        toolbar.add(btnLine); toolbar.add(btnPen); toolbar.add(btnErase); toolbar.add(btnDelete);
-        toolbar.add(Box.createHorizontalStrut(10));
-        
-        toolbar.add(btnColorPicker); toolbar.add(sizeSelector);
-        toolbar.add(Box.createHorizontalStrut(10));
-
-        toolbar.add(Box.createHorizontalStrut(20)); toolbar.add(btnClear);
 
         add(toolbar, BorderLayout.NORTH);
         add(canvas, BorderLayout.CENTER);
@@ -140,16 +170,28 @@ public class WhiteboardFrame extends JFrame {
 
     }
 
+    private JButton createToolButton(String text) {
+        JButton button = new JButton(text);
+        button.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        button.setFocusPainted(false);
+        button.setBorder(BorderFactory.createRaisedBevelBorder());
+        button.setPreferredSize(new Dimension(80, 30));
+        return button;
+    }
+
     // ✅ NEW: Update tool button styles to show active tool
     private void updateToolButtons(JButton activeBtn, JButton[] allBtns) {
         for (JButton btn : allBtns) {
             if (btn == activeBtn) {
-                btn.setBackground(new Color(100, 150, 200));
+                btn.setBackground(new Color(0, 123, 255));
+                btn.setForeground(Color.WHITE);
                 btn.setOpaque(true);
-                btn.setFocusPainted(false);
+                btn.setBorder(BorderFactory.createLoweredBevelBorder());
             } else {
                 btn.setBackground(UIManager.getColor("Button.background"));
+                btn.setForeground(Color.BLACK);
                 btn.setOpaque(false);
+                btn.setBorder(BorderFactory.createRaisedBevelBorder());
             }
         }
     }
@@ -157,7 +199,7 @@ public class WhiteboardFrame extends JFrame {
     public CanvasPanel getCanvas() { return canvas; }
     public void updateStatus(String text) { SwingUtilities.invokeLater(() -> statusLabel.setText(" " + text)); }
     public void setAlive(boolean alive) {
-        updateStatus("Status: " + (alive ? "✅ Syncing" : "⏳ Connecting..."));
+        updateStatus("Status: " + (alive ? "Syncing" : "Connecting..."));
     }
 
     public void bindNetworkSender(java.util.function.Consumer<String> sender) {
@@ -192,7 +234,7 @@ public class WhiteboardFrame extends JFrame {
         if ("PONG".equals(rawCmd)) { setAlive(true); return; }
         if ("HOST_CLOSED".equals(rawCmd)) {
             SwingUtilities.invokeLater(() -> {
-                JOptionPane.showMessageDialog(this, "🚪 Host closed session", "Session Ended", JOptionPane.INFORMATION_MESSAGE);
+                JOptionPane.showMessageDialog(this, "Host closed session", "Session Ended", JOptionPane.INFORMATION_MESSAGE);
                 dispose();
             });
             return;
@@ -200,14 +242,14 @@ public class WhiteboardFrame extends JFrame {
 
         // ✅ Detect SYNC_START command from host
         if ("SYNC_START".equals(rawCmd)) {
-            System.out.println("🔄 Received SYNC_START - beginning animated sync");
+            System.out.println("Received SYNC_START - beginning animated sync");
             canvas.startInitialSync();
             return;
         }
 
         // ✅ Detect SYNC_END command from host
         if ("SYNC_END".equals(rawCmd)) {
-            System.out.println("✅ Received SYNC_END - finishing animated sync");
+            System.out.println("Received SYNC_END - finishing animated sync");
             canvas.endInitialSync();
             return;
         }
@@ -222,10 +264,10 @@ public class WhiteboardFrame extends JFrame {
                 if (cmd != null && cmd.username != null && !cmd.username.equals(username)) {
                     // This is a command from a client - store it in the database
                     DatabaseManager.insertDrawCommand(sessionId, cmd);
-                    System.out.println("💾 Stored client command from " + cmd.username + ": " + cmd.type);
+                    System.out.println("Stored client command from " + cmd.username + ": " + cmd.type);
                 }
             } catch (Exception e) {
-                System.err.println("⚠️ Failed to store client command: " + e.getMessage());
+                System.err.println("Failed to store client command: " + e.getMessage());
             }
         }
         canvas.addRemoteCommand(rawCmd);

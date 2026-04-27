@@ -13,7 +13,7 @@ public class CanvasPanel extends JPanel {
     private final List<DrawCommand> history = new ArrayList<>();
     private DrawCommand currentStroke = null;
     private List<Point> penPath = null;
-    private List<Point> eraserPath = null; // ✅ NEW: Store eraser path
+    private List<Point> eraserPath = null; // Store eraser path
     private Consumer<String> onLocalDraw;
     private Runnable onHistoryChanged;
     private String currentColor = "#000000";
@@ -24,7 +24,7 @@ public class CanvasPanel extends JPanel {
     private boolean isInitialSync = false;
     private List<String> pendingSyncCommands = new ArrayList<>(); // Raw strings, not DrawCommand
     private Timer syncAnimationTimer;
-    private static final int SYNC_DELAY_MS = 1000; // Faster animation
+    private static final int SYNC_DELAY_MS = 1000; // Animation delay in milliseconds
     private boolean isReplayingSync = false; // Prevent infinite loop during replay
 
     public CanvasPanel() {
@@ -117,14 +117,16 @@ public class CanvasPanel extends JPanel {
         });
     }
 
-    // ✅ Broadcast command to network
+    // ...existing code...
+
+    // Broadcast command to network
     private void broadcast(DrawCommand cmd) {
         if (onLocalDraw != null) {
             onLocalDraw.accept(CommandProtocol.serialize(cmd));
         }
     }
 
-    // ✅ Notify listeners of history changes
+    // Notify listeners of history changes
     private void notifyHistoryChanged() {
         if (onHistoryChanged != null) {
             onHistoryChanged.run();
@@ -205,7 +207,7 @@ public class CanvasPanel extends JPanel {
         return p.distance(x1 + t*dx, y1 + t*dy);
     }
 
-    // ✅ Public setters
+    // Public setters for tool configuration
     public void setOnLocalDraw(Consumer<String> listener) { this.onLocalDraw = listener; }
     public void setOnHistoryChanged(Runnable listener) { this.onHistoryChanged = listener; }
     public void setToolSettings(String color, float width) {
@@ -218,7 +220,7 @@ public class CanvasPanel extends JPanel {
 
 
 
-    // ✅ Process remote commands - SYNC ALL ACTIONS
+    // Process remote commands - handle all action types
     public void addRemoteCommand(String rawCmd) {
         if (isInitialSync && !isReplayingSync) {
             // Queue for animated replay during initial sync
@@ -230,7 +232,7 @@ public class CanvasPanel extends JPanel {
     }
 
     private void draw(Graphics2D g2, DrawCommand c) {
-        // ✅ Safe color decoding with fallback
+        // Safe color decoding with fallback
         Color drawColor;
         try {
             String hex = c.colorHex;
@@ -240,7 +242,7 @@ public class CanvasPanel extends JPanel {
                 drawColor = Color.decode(hex);
             }
         } catch (Exception e) {
-            System.err.println("⚠️ Color decode failed for: " + c.colorHex + ", using black");
+            System.err.println("Warning: Color decode failed for: " + c.colorHex + ", using black");
             drawColor = Color.BLACK;
         }
 
@@ -291,19 +293,19 @@ public class CanvasPanel extends JPanel {
         return currentColor;
     }
 
-    // ✅ Getter for current stroke width (used by size selector)
+    // Getter for current stroke width (used by size selector)
     public float getCurrentStrokeWidth() {
         return currentStrokeWidth;
     }
 
-    // ✅ Emit a raw command directly to network (used for CLEAR)
+    // Emit a raw command directly to network (used for CLEAR)
     public void emitLocalCommand(String rawCmd) {
         if (onLocalDraw != null) {
             onLocalDraw.accept(rawCmd);
         }
     }
 
-    // ✅ Getters for tool state (optional but useful)
+    // Getters for tool state
     public DrawCommand.Type getCurrentTool() {
         return currentTool;
     }
@@ -312,16 +314,16 @@ public class CanvasPanel extends JPanel {
         return currentUsername;
     }
 
-    // ✅ NEW: Start initial sync animation
+    // Start initial sync animation
     public void startInitialSync() {
         isInitialSync = true;
         isReplayingSync = false;
         pendingSyncCommands.clear();
         if (syncAnimationTimer != null) syncAnimationTimer.stop();
-        System.out.println("🎬 Starting initial sync animation...");
+        System.out.println("Starting initial sync animation...");
     }
 
-    // ✅ NEW: End initial sync animation
+    // End initial sync animation
     public void endInitialSync() {
         isInitialSync = false;
         if (syncAnimationTimer != null) {
@@ -340,10 +342,10 @@ public class CanvasPanel extends JPanel {
             repaint();
             notifyHistoryChanged();
         }
-        System.out.println("✅ Initial sync animation complete - canvas matches host");
+        System.out.println("Initial sync animation complete - canvas matches host");
     }
 
-    // ✅ NEW: Add command to animation queue
+    // Add command to animation queue
     private void addToSyncAnimation(String rawCmd) {
         if (!isInitialSync) {
             // Not in sync mode, process normally
@@ -357,18 +359,18 @@ public class CanvasPanel extends JPanel {
         if (syncAnimationTimer == null && !isReplayingSync) {syncAnimationTimer = new Timer(SYNC_DELAY_MS, e -> animateNextSyncCommand());
             syncAnimationTimer.setRepeats(true);
             syncAnimationTimer.start();
-            System.out.println("⏱️ Sync animation timer started");
+            System.out.println("Sync animation timer started");
         }
     }
 
-    // ✅ NEW: Animate next command in sync queue
+    // Animate next command in sync queue
     private void animateNextSyncCommand() {
         if (pendingSyncCommands.isEmpty()) {
             if (syncAnimationTimer != null) {
                 syncAnimationTimer.stop();
                 syncAnimationTimer = null;
             }
-            System.out.println("🎬 Sync animation queue empty");
+            System.out.println("Sync animation queue empty");
             return;
         }
 
@@ -379,7 +381,7 @@ public class CanvasPanel extends JPanel {
         addRemoteCommandInternal(rawCmd, true);
 
         // Progress debug
-        System.out.println("🎨 Sync: " + rawCmd.substring(0, Math.min(40, rawCmd.length())) +
+        System.out.println("Sync: " + rawCmd.substring(0, Math.min(40, rawCmd.length())) +
                 "... (" + pendingSyncCommands.size() + " remaining)");
     }
     private void addRemoteCommandInternal(String rawCmd, boolean isSyncReplay) {
@@ -394,8 +396,6 @@ public class CanvasPanel extends JPanel {
         try {
             DrawCommand cmd = CommandProtocol.deserialize(rawCmd);
             if (cmd == null) return;
-
-
 
             if (cmd.type == DrawCommand.Type.DELETE) {
                 for (int i = history.size() - 1; i >= 0; i--) {
@@ -423,13 +423,13 @@ public class CanvasPanel extends JPanel {
                 return;
             }
 
-            // ✅ Normal drawing commands
+            // Normal drawing commands
             history.add(cmd);
             repaint();
             notifyHistoryChanged();
 
         } catch (Exception e) {
-            System.err.println("❌ Sync replay failed: " + rawCmd + " | " + e.getMessage());
+            System.err.println("Sync replay failed: " + rawCmd + " | " + e.getMessage());
         }
     }
 
