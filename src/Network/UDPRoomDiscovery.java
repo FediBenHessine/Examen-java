@@ -64,14 +64,41 @@ public class UDPRoomDiscovery {
                             System.out.println("🔒 Private room - not responding to discovery request from " + packet.getAddress().getHostAddress());
                         }
                     } else if ("JOIN_REQUEST".equals(request.split("\\|")[0])) {
-                        if (onDiscoveryRequest != null) {
-                            onDiscoveryRequest.accept(packet.getAddress().getHostAddress());
+                        // Parse join request: JOIN_REQUEST|roomName|password
+                        String[] parts = request.split("\\|");
+                        String requestedRoomName = parts.length > 1 ? parts[1] : "";
+                        String providedPassword = parts.length > 2 ? parts[2] : "";
+
+                        // Validate room name and password against host's database
+                        boolean isValidJoin = false;
+                        if (roomName.equals(requestedRoomName)) {
+                            if (roomType == Model.RoomType.PUBLIC) {
+                                // Public rooms don't require password
+                                isValidJoin = true;
+                            } else {
+                                // Password-protected rooms: validate against stored password
+                                isValidJoin = (password != null && password.equals(providedPassword));
+                            }
                         }
-                        // Send JOIN_ACCEPTED response
-                        byte[] responseData = "JOIN_ACCEPTED".getBytes();
-                        DatagramPacket responsePacket = new DatagramPacket(
-                                responseData, responseData.length, packet.getAddress(), packet.getPort());
-                        socket.send(responsePacket);
+
+                        if (isValidJoin) {
+                            if (onDiscoveryRequest != null) {
+                                onDiscoveryRequest.accept(packet.getAddress().getHostAddress());
+                            }
+                            // Send JOIN_ACCEPTED response
+                            byte[] responseData = "JOIN_ACCEPTED".getBytes();
+                            DatagramPacket responsePacket = new DatagramPacket(
+                                    responseData, responseData.length, packet.getAddress(), packet.getPort());
+                            socket.send(responsePacket);
+                            System.out.println("✅ Join request accepted for room '" + roomName + "' from " + packet.getAddress().getHostAddress());
+                        } else {
+                            // Send JOIN_REJECTED response
+                            byte[] responseData = "JOIN_REJECTED".getBytes();
+                            DatagramPacket responsePacket = new DatagramPacket(
+                                    responseData, responseData.length, packet.getAddress(), packet.getPort());
+                            socket.send(responsePacket);
+                            System.out.println("❌ Join request rejected for room '" + roomName + "' from " + packet.getAddress().getHostAddress());
+                        }
                     }
                 }
             } catch (IOException e) {
@@ -164,7 +191,15 @@ public class UDPRoomDiscovery {
 
             String result = new String(response.getData(), 0, response.getLength()).trim();
             socket.close();
-            return "JOIN_ACCEPTED".equals(result);
+            if ("JOIN_ACCEPTED".equals(result)) {
+                return true;
+            } else if ("JOIN_REJECTED".equals(result)) {
+                System.out.println("❌ Join request rejected by host");
+                return false;
+            } else {
+                System.err.println("❌ Unexpected response from host: " + result);
+                return false;
+            }
         } catch (IOException e) {
             System.err.println("❌ Join request failed: " + e.getMessage());
             return false;

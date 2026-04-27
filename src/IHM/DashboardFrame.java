@@ -95,7 +95,7 @@ public class DashboardFrame extends JFrame {
                     dialog.setEnabled(false);
                     statusLabel.setText(" Status: 🔐 Verifying password...");
                     new Thread(() -> {
-                        boolean isValid = DatabaseManager.validateRoomPassword(room.hostIP, room.socketPort, password);
+                        boolean isValid = udpDiscovery.requestJoin(room.hostIP, room.roomName, password);
                         SwingUtilities.invokeLater(() -> {
                             dialog.setEnabled(true);
                             if (isValid) {
@@ -384,7 +384,7 @@ public class DashboardFrame extends JFrame {
             statusLabel.setText(" Status: 🔐 Verifying password...");
 
             new Thread(() -> {
-                boolean isValid = DatabaseManager.validateRoomPassword(room.hostIP, room.socketPort, password);
+                boolean isValid = udpDiscovery.requestJoin(room.hostIP, room.roomName, password);
                 SwingUtilities.invokeLater(() -> {
                     parentDialog.setEnabled(true);
                     if (isValid) {
