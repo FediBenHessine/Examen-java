@@ -4,9 +4,9 @@ import javax.swing.*;
 import java.awt.*;
 
 public class LoginDialog extends JDialog {
-    private JTextField txtUser = new JTextField(15);
-    private JPasswordField txtPass = new JPasswordField(15);
-    private JLabel lblStatus = new JLabel(" ");
+    private final JTextField txtUser = new JTextField(15);
+    private final JPasswordField txtPass = new JPasswordField(15);
+    private final JLabel lblStatus = new JLabel(" ");
     private String authenticatedUser;
 
     public LoginDialog(JFrame parent) {

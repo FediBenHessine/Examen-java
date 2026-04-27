@@ -4,9 +4,16 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="42cf3cba-c83a-40c9-86ee-709d12ffb7e9" name="Changes" comment="Add remote database connection support and update draw command handling">
-      <change afterPath="$PROJECT_DIR$/.idea/copilotDiffState.xml" afterDir="false" />
+    <list default="true" id="42cf3cba-c83a-40c9-86ee-709d12ffb7e9" name="Changes" comment="Implement direct join functionality for private rooms with password validation">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/Database/DatabaseManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/Database/DatabaseManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/Database/Singleton.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/Database/Singleton.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/IHM/CanvasPanel.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/IHM/CanvasPanel.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/IHM/DashboardFrame.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/IHM/DashboardFrame.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/IHM/LoginDialog.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/IHM/LoginDialog.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/IHM/WhiteboardFrame.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/IHM/WhiteboardFrame.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/Network/NetworkUtils.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/Network/NetworkUtils.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/Network/UDPRoomDiscovery.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/Network/UDPRoomDiscovery.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -21,7 +28,7 @@
     </persistenceIdMap>
   </component>
   <component name="EmbeddingIndexingInfo">
-    <option name="cachedIndexableFilesCount" value="47" />
+    <option name="cachedIndexableFilesCount" value="48" />
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -112,7 +119,8 @@
       <updated>1777122675600</updated>
       <workItem from="1777283471085" duration="2675000" />
       <workItem from="1777286356822" duration="621000" />
-      <workItem from="1777299417046" duration="4078000" />
+      <workItem from="1777299417046" duration="6011000" />
+      <workItem from="1777315615391" duration="2551000" />
     </task>
     <task id="LOCAL-00001" summary="Working Sign up">
       <option name="closed" value="true" />
@@ -202,7 +210,15 @@
       <option name="project" value="LOCAL" />
       <updated>1777302688233</updated>
     </task>
-    <option name="localTasksCounter" value="12" />
+    <task id="LOCAL-00012" summary="Implement direct join functionality for private rooms with password validation">
+      <option name="closed" value="true" />
+      <created>1777303835922</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
+      <option name="project" value="LOCAL" />
+      <updated>1777303835922</updated>
+    </task>
+    <option name="localTasksCounter" value="13" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -231,7 +247,8 @@
     <MESSAGE value="Comment out user existence check in session initialization" />
     <MESSAGE value="Refactor room join request handling to validate against room name and password" />
     <MESSAGE value="Add remote database connection support and update draw command handling" />
-    <option name="LAST_COMMIT_MESSAGE" value="Add remote database connection support and update draw command handling" />
+    <MESSAGE value="Implement direct join functionality for private rooms with password validation" />
+    <option name="LAST_COMMIT_MESSAGE" value="Implement direct join functionality for private rooms with password validation" />
   </component>
   <component name="github-copilot-workspace">
     <instructionFileLocations>

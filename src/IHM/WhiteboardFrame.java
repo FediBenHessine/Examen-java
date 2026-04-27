@@ -10,17 +10,13 @@ import java.awt.event.WindowEvent;
 public class WhiteboardFrame extends JFrame {
     private final CanvasPanel canvas;
     private final JLabel statusLabel;
-    private boolean isAlive;
     private final boolean isHost;
     private final int sessionId;
     private Timer heartbeatTimer;
-    private int missedPongCount = 0;
     private static final int MAX_MISSED_PONGS = 3;
     private java.util.function.Consumer<String> networkSender;
-    private JButton btnUndo;
-    private JButton btnRedo;
+
     private final String username; // ✅ NEW: Track username
-    private boolean syncStarted = false;
 
     public WhiteboardFrame(boolean isHost, String username, int sessionId) {
         this.isHost = isHost;
@@ -34,17 +30,11 @@ public class WhiteboardFrame extends JFrame {
         canvas = new CanvasPanel();
         canvas.setCurrentUsername(username); // ✅ NEW: Set username in canvas
         // ✅ FIX: Connect canvas to button updater
-        canvas.setOnHistoryChanged(this::updateUndoRedoButtons);
         statusLabel = new JLabel(" Status: Initializing...");
         statusLabel.setForeground(Color.GRAY);
 
         JPanel toolbar = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        
-        // ✅ UNDO/REDO buttons
-        btnUndo = new JButton("↶ Undo");
-        btnRedo = new JButton("↷ Redo");
-        btnUndo.setEnabled(false);
-        btnRedo.setEnabled(false);
+
         
         // ✅ NEW: Tool buttons
         JButton btnLine = new JButton("📏 Line");
@@ -61,15 +51,7 @@ public class WhiteboardFrame extends JFrame {
         sizeSelector.setSelectedIndex(1); // Default 2px
         
 
-        // ✅ Event handlers - Undo/Redo
-        btnUndo.addActionListener(e -> {
-            canvas.undo();
-//            updateUndoRedoButtons();
-        });
-        btnRedo.addActionListener(e -> {
-            canvas.redo();
-//            updateUndoRedoButtons();
-        });
+
         
         // ✅ NEW: Tool selection buttons
         btnLine.addActionListener(e -> {
@@ -134,7 +116,6 @@ public class WhiteboardFrame extends JFrame {
         add(toolbar, BorderLayout.NORTH);
         add(canvas, BorderLayout.CENTER);
         add(statusLabel, BorderLayout.SOUTH);
-        SwingUtilities.invokeLater(this::updateUndoRedoButtons);
 
         // ✅ FIX 1: Start heartbeat timer ONLY for clients
         if (!isHost) {
@@ -176,17 +157,11 @@ public class WhiteboardFrame extends JFrame {
     public CanvasPanel getCanvas() { return canvas; }
     public void updateStatus(String text) { SwingUtilities.invokeLater(() -> statusLabel.setText(" " + text)); }
     public void setAlive(boolean alive) {
-        this.isAlive = alive;
-        resetHeartbeat(); // Reset pong counter on status change
         updateStatus("Status: " + (alive ? "✅ Syncing" : "⏳ Connecting..."));
     }
 
     public void bindNetworkSender(java.util.function.Consumer<String> sender) {
         this.networkSender = sender;
-    }
-
-    private void resetHeartbeat() {
-        missedPongCount = 0;
     }
 
     // ✅ FIX 3: Offload DB write to background thread + include username
@@ -226,7 +201,6 @@ public class WhiteboardFrame extends JFrame {
         // ✅ Detect SYNC_START command from host
         if ("SYNC_START".equals(rawCmd)) {
             System.out.println("🔄 Received SYNC_START - beginning animated sync");
-            syncStarted = true;
             canvas.startInitialSync();
             return;
         }
@@ -235,7 +209,6 @@ public class WhiteboardFrame extends JFrame {
         if ("SYNC_END".equals(rawCmd)) {
             System.out.println("✅ Received SYNC_END - finishing animated sync");
             canvas.endInitialSync();
-            syncStarted = false;
             return;
         }
 
@@ -258,15 +231,5 @@ public class WhiteboardFrame extends JFrame {
         canvas.addRemoteCommand(rawCmd);
     }
     // ✅ Update undo/redo button states
-    private void updateUndoRedoButtons() {
-        if (SwingUtilities.isEventDispatchThread()) {
-            btnUndo.setEnabled(canvas.canUndo());
-            btnRedo.setEnabled(canvas.canRedo());
-        } else {
-            SwingUtilities.invokeLater(() -> {
-                btnUndo.setEnabled(canvas.canUndo());
-                btnRedo.setEnabled(canvas.canRedo());
-            });
-        }
-    }
+
 }

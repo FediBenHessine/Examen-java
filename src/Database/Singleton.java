@@ -14,7 +14,7 @@ public class Singleton {
 
     static {
         try {
-            Class.forName("com.mysql.cj.jdbc.Driver");
+            Class.forName(NOM_DRIVER);
         } catch (ClassNotFoundException e) {
             throw new RuntimeException("MySQL JDBC Driver not found", e);
         }
@@ -25,10 +25,10 @@ public class Singleton {
         return DriverManager.getConnection(URL_DB,USERNAME,PASSWORD);
     }
 
-    // Creates a connection to a remote host's database
-    public static Connection getRemoteConnection(String hostIP) throws SQLException {
-        return DriverManager.getConnection(DatabaseConfig.getRemoteURL(hostIP), USERNAME, PASSWORD);
-    }
+//    // Creates a connection to a remote host's database
+//    public static Connection getRemoteConnection(String hostIP) throws SQLException {
+//        return DriverManager.getConnection(DatabaseConfig.getRemoteURL(hostIP), USERNAME, PASSWORD);
+//    }
 
     public static void main(String[] args) {
 //        System.out.println(Singleton.getConnection());

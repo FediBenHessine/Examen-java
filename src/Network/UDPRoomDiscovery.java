@@ -23,9 +23,6 @@ public class UDPRoomDiscovery {
     private Runnable onError;
 
     public void setOnRoomDiscovered(Consumer<RoomInfo> listener) { this.onRoomDiscovered = listener; }
-    public void setOnDiscoveryRequest(Consumer<String> listener) { this.onDiscoveryRequest = listener; }
-    public void setOnError(Runnable listener) { this.onError = listener; }
-
     // === HOST MODE: Listen for discovery requests ===
     public void startListening(String hostIP, int socketPort, String roomName,
                                String username, Model.RoomType roomType, String password) {

@@ -38,15 +38,4 @@ public class NetworkUtils {
             return "127.0.0.1";
         }
     }
-
-    /**
-     * Check if a host is reachable (for pre-join validation)
-     */
-    public static boolean isHostReachable(String ip, int timeoutMs) {
-        try {
-            return InetAddress.getByName(ip).isReachable(timeoutMs);
-        } catch (Exception e) {
-            return false;
-        }
-    }
 }

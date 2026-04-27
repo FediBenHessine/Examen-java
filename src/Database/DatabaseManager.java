@@ -166,63 +166,6 @@ public class DatabaseManager {
         }
     }
 
-    // ✅ ROOMS: Validate join password
-    public static boolean validateRoomPassword(int roomId, String password) {
-        String sql = "SELECT password_hash FROM rooms WHERE id = ? AND is_active = TRUE";
-        try (Connection conn = getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, roomId);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (!rs.next()) return false;
-                String storedHash = rs.getString("password_hash");
-                return storedHash == null || storedHash.equals(password); // Plaintext for demo
-            }
-        } catch (SQLException e) {
-            System.err.println("Password validation failed: " + e.getMessage());
-            return false;
-        }
-    }
-
-    // ✅ ROOMS: Get active public rooms (for discovery list)
-    public static List<RoomInfo> getPublicRooms() {
-        List<Model.RoomInfo> rooms = new ArrayList<>();
-        String sql = "SELECT r.*, u.username as host_username, rt.name as room_type " +
-                "FROM rooms r JOIN users u ON r.host_username = u.username " +
-                "JOIN room_types rt ON r.room_type_id = rt.id " +
-                "WHERE r.is_active = TRUE AND rt.name != 'PRIVATE'";
-        try (Connection conn = getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-            while (rs.next()) {
-                Model.RoomType type = Model.RoomType.valueOf(rs.getString("room_type"));
-                rooms.add(new Model.RoomInfo(
-                        rs.getString("room_name"),
-                        rs.getString("host_username"),
-                        rs.getString("host_ip"),
-                        rs.getInt("socket_port"),
-                        type,
-                        type != Model.RoomType.PUBLIC && rs.getString("password_hash") != null
-                ));
-            }
-        } catch (SQLException e) {
-            System.err.println("Failed to fetch public rooms: " + e.getMessage());
-        }
-        return rooms;
-    }
-    public static String getUserRole(String username) {
-        String sql = "SELECT role FROM users WHERE username = ?";
-        try (Connection conn = getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, username);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? rs.getString("role") : "CLIENT";
-            }
-        } catch (SQLException e) {
-            System.err.println("Failed to fetch user role: " + e.getMessage());
-            return "CLIENT";
-        }
-    }
-    // Database/DatabaseManager.java
 
     public static List<String> getDrawCommandsForSession(int sessionId) {
         List<String> commands = new ArrayList<>();
@@ -269,61 +212,8 @@ public class DatabaseManager {
         }
         return commands;
     }
-    /**
-     * Validates room password against active sessions in MySQL.
-     * Returns true if password matches, or if room is public.
-     */
-    public static boolean validateRoomPassword(String hostIP, int socketPort, String password) {
-        String sql = "SELECT password_hash FROM rooms WHERE host_ip = ? AND socket_port = ? AND is_active = TRUE ORDER BY id DESC  LIMIT 1";
-        try (Connection conn = getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, hostIP);
-            ps.setInt(2, socketPort);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    String stored = rs.getString("password_hash");
-                    // If stored is null, it's a public room (bypass validation)
-                    if (stored == null) return true;
-                    // Plaintext comparison for demo (use BCrypt in production)
-                    return stored.equals(password);
-                }
-                return false; // Room not found or inactive
-            }
-        } catch (SQLException e) {
-            System.err.println("❌ DB Password Validation Error: " + e.getMessage());
-            return false;
-        }
-    }
-    /**
-     * Get room info by host IP (for direct join) - connects to remote database
-     * Returns null if no active room found at that IP
-     */
-    public static RoomInfo getRoomByIP(String hostIP) {
-        String sql = "SELECT r.*, u.username as host_username, rt.name as room_type " +
-                "FROM rooms r JOIN users u ON r.host_username = u.username " +
-                "JOIN room_types rt ON r.room_type_id = rt.id " +
-                "WHERE r.host_ip = ? AND r.is_active = TRUE ORDER BY r.id DESC LIMIT 1";
-        try (Connection conn = Singleton.getRemoteConnection(hostIP);
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, hostIP);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    Model.RoomType type = Model.RoomType.valueOf(rs.getString("room_type"));
-                    return new Model.RoomInfo(
-                            rs.getString("room_name"),
-                            rs.getString("host_username"),
-                            rs.getString("host_ip"),
-                            rs.getInt("socket_port"),
-                            type,
-                            type != Model.RoomType.PUBLIC // Requires password if not public
-                    );
-                }
-            }
-        } catch (SQLException e) {
-            System.err.println("❌ Failed to get room by IP from remote host " + hostIP + ": " + e.getMessage());
-        }
-        return null;
-    }
+
+
     public static void main(String[] args) {
         // Test authentication
         System.out.println("Testing authentication...");

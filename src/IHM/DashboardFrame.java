@@ -3,8 +3,8 @@ package IHM;
 import Database.DatabaseManager;
 import Model.RoomInfo;
 import Model.RoomType;
-import Network.UDPRoomDiscovery;
 import Network.NetworkUtils;
+import Network.UDPRoomDiscovery;
 import RMI.RemoteSession;
 import RMI.SessionImpl;
 
@@ -12,10 +12,62 @@ import javax.swing.*;
 import java.awt.*;
 import java.rmi.Naming;
 import java.util.List;
-import java.util.logging.Logger;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class DashboardFrame extends JFrame {
+    private static final Logger LOGGER = Logger.getLogger(DashboardFrame.class.getName());
+    private final String username;
+    private final JLabel statusLabel;
+    private final DefaultListModel<RoomInfo> roomListModel;
+    private UDPRoomDiscovery udpDiscovery;
+    // ✅ CRITICAL: Keep socket references alive to prevent GC
+    private Network.SocketServer hostSocketServer;
+    private Network.SocketClient clientSocketClient;
+    // ✅ Prevent multiple simultaneous discoveries
+    private volatile boolean discoveryInProgress = false;
+    private volatile boolean joinDialogOpen = false;
+    public DashboardFrame(String username) {
+        this.username = username;
+
+        setTitle("🎨 Whiteboard Dashboard - " + username);
+        setSize(550, 450);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+        setLayout(new BorderLayout(10, 10));
+
+        JPanel header = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        header.add(new JLabel("👋 Welcome, " + username + "!"));
+        header.add(Box.createHorizontalGlue());
+        JButton btnLogout = new JButton("🚪 Logout");
+        btnLogout.addActionListener(e -> {
+            if (udpDiscovery != null) udpDiscovery.stop();
+            dispose();
+            new LoginDialog(null).setVisible(true);
+        });
+        header.add(btnLogout);
+        add(header, BorderLayout.NORTH);
+
+        JPanel actions = new JPanel(new GridLayout(1, 2, 10, 10));
+        JButton btnHost = new JButton("<html><h2>🏠 Host a Room</h2><br>Create a new whiteboard session<br>others can join you</html>");
+        btnHost.setPreferredSize(new Dimension(250, 100));
+        btnHost.addActionListener(e -> showHostRoomDialog());
+        JButton btnJoin = new JButton("<html><h2>🔍 Join a Room</h2><br>Discover or connect to an existing session<br>collaborate in real-time</html>");
+        btnJoin.setPreferredSize(new Dimension(250, 100));
+        btnJoin.addActionListener(e -> showJoinRoomDialog());
+        actions.add(btnHost);
+        actions.add(btnJoin);
+        add(actions, BorderLayout.CENTER);
+
+        statusLabel = new JLabel(" Status: Ready | IP: " + NetworkUtils.getLocalIP());
+        add(statusLabel, BorderLayout.SOUTH);
+
+        udpDiscovery = new UDPRoomDiscovery();
+        roomListModel = new DefaultListModel<>();
+        udpDiscovery.setOnRoomDiscovered(roomListModel::addElement);
+    }
+    // ✅ Prevent multiple join dialogs
+
     // === JOIN FLOW ===
     private void showJoinRoomDialog() {
         if (joinDialogOpen) {
@@ -120,6 +172,7 @@ public class DashboardFrame extends JFrame {
                 System.out.println("ℹ️ Join dialog windowClosed event triggered");
                 cleanup.run();
             }
+
             @Override
             public void windowClosing(java.awt.event.WindowEvent e) {
                 System.out.println("ℹ️ Join dialog windowClosing event triggered");
@@ -144,7 +197,9 @@ public class DashboardFrame extends JFrame {
         System.out.println("📂 Opening join dialog...");
         dialog.setVisible(true);
         // ⚠️ Code here runs AFTER dialog closes - timer already stopped by cleanup
-    }    private void discoverRoomsAsync() {
+    }
+
+    private void discoverRoomsAsync() {
         // ✅ Prevent overlapping discoveries
         if (discoveryInProgress) return;
         discoveryInProgress = true;
@@ -159,61 +214,6 @@ public class DashboardFrame extends JFrame {
                 discoveryInProgress = false; // ✅ Allow new discoveries
             });
         }, "UDP-Discovery-Thread").start();
-    }
-    private static final Logger LOGGER = Logger.getLogger(DashboardFrame.class.getName());
-    private final String username;
-    private final JLabel statusLabel;
-    private UDPRoomDiscovery udpDiscovery;
-
-    private final DefaultListModel<RoomInfo> roomListModel;
-    // ✅ CRITICAL: Keep socket references alive to prevent GC
-    private Network.SocketServer hostSocketServer;
-
-    private Network.SocketClient clientSocketClient;
-    // ✅ Prevent multiple simultaneous discoveries
-    private volatile boolean discoveryInProgress = false;
-    // ✅ Prevent multiple join dialogs
-
-    private volatile boolean joinDialogOpen = false;
-
-    public DashboardFrame(String username) {
-        this.username = username;
-
-        setTitle("🎨 Whiteboard Dashboard - " + username);
-        setSize(550, 450);
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setLocationRelativeTo(null);
-        setLayout(new BorderLayout(10, 10));
-
-        JPanel header = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        header.add(new JLabel("👋 Welcome, " + username + "!"));
-        header.add(Box.createHorizontalGlue());
-        JButton btnLogout = new JButton("🚪 Logout");
-        btnLogout.addActionListener(e -> {
-            if (udpDiscovery != null) udpDiscovery.stop();
-            dispose();
-            new LoginDialog(null).setVisible(true);
-        });
-        header.add(btnLogout);
-        add(header, BorderLayout.NORTH);
-
-        JPanel actions = new JPanel(new GridLayout(1, 2, 10, 10));
-        JButton btnHost = new JButton("<html><h2>🏠 Host a Room</h2><br>Create a new whiteboard session<br>others can join you</html>");
-        btnHost.setPreferredSize(new Dimension(250, 100));
-        btnHost.addActionListener(e -> showHostRoomDialog());
-        JButton btnJoin = new JButton("<html><h2>🔍 Join a Room</h2><br>Discover or connect to an existing session<br>collaborate in real-time</html>");
-        btnJoin.setPreferredSize(new Dimension(250, 100));
-        btnJoin.addActionListener(e -> showJoinRoomDialog());
-        actions.add(btnHost);
-        actions.add(btnJoin);
-        add(actions, BorderLayout.CENTER);
-
-        statusLabel = new JLabel(" Status: Ready | IP: " + NetworkUtils.getLocalIP());
-        add(statusLabel, BorderLayout.SOUTH);
-
-        udpDiscovery = new UDPRoomDiscovery();
-        roomListModel = new DefaultListModel<>();
-        udpDiscovery.setOnRoomDiscovered(roomListModel::addElement);
     }
     // === HOST FLOW ===
 
@@ -232,15 +232,20 @@ public class DashboardFrame extends JFrame {
             txtPassword.setEnabled(selected != RoomType.PUBLIC);
         });
 
-        dialog.add(new JLabel("Room Name:")); dialog.add(txtRoomName);
-        dialog.add(new JLabel("Visibility:")); dialog.add(cmbType);
-        dialog.add(new JLabel("Password:")); dialog.add(txtPassword);
-        dialog.add(new JLabel("Socket Port:")); dialog.add(txtPort);
+        dialog.add(new JLabel("Room Name:"));
+        dialog.add(txtRoomName);
+        dialog.add(new JLabel("Visibility:"));
+        dialog.add(cmbType);
+        dialog.add(new JLabel("Password:"));
+        dialog.add(txtPassword);
+        dialog.add(new JLabel("Socket Port:"));
+        dialog.add(txtPort);
 
         JButton btnCreate = new JButton("🚀 Start Hosting");
         JPanel btnPanel = new JPanel();
         btnPanel.add(btnCreate);
-        dialog.add(new JLabel()); dialog.add(btnPanel);
+        dialog.add(new JLabel());
+        dialog.add(btnPanel);
 
         btnCreate.addActionListener(e -> {
             String roomName = txtRoomName.getText().trim();
@@ -248,8 +253,11 @@ public class DashboardFrame extends JFrame {
             if (type == null) type = RoomType.PUBLIC;
             String password = (type == RoomType.PUBLIC) ? null : new String(txtPassword.getPassword());
             int port;
-            try { port = Integer.parseInt(txtPort.getText()); }
-            catch (NumberFormatException ex) { port = 8083; }
+            try {
+                port = Integer.parseInt(txtPort.getText());
+            } catch (NumberFormatException ex) {
+                port = 8083;
+            }
 
             if (roomName.isEmpty()) {
                 JOptionPane.showMessageDialog(dialog, "Room name is required", "Error", JOptionPane.ERROR_MESSAGE);
@@ -276,8 +284,11 @@ public class DashboardFrame extends JFrame {
                     DatabaseManager.createRoom(username, finalRoomName, finalType, finalPassword, localIP, finalPort);
 
                     SessionImpl session = new SessionImpl();
-                    try { java.rmi.registry.LocateRegistry.createRegistry(1099); }
-                    catch (java.rmi.RemoteException ex) { System.out.println("ℹ️ RMI registry already exists"); }
+                    try {
+                        java.rmi.registry.LocateRegistry.createRegistry(1099);
+                    } catch (java.rmi.RemoteException ex) {
+                        System.out.println("ℹ️ RMI registry already exists");
+                    }
                     Naming.rebind("rmi://" + localIP + ":1099/WhiteboardSession", session);
                     session.registerUser(username);
                     int sessionId = session.notifySessionStart();
@@ -309,7 +320,10 @@ public class DashboardFrame extends JFrame {
 
                             for (String cmd : history) {
                                 // Small delay between commands for smooth animation (optional)
-                                try { Thread.sleep(10); } catch (InterruptedException ignored) {}
+                                try {
+                                    Thread.sleep(10);
+                                } catch (InterruptedException ignored) {
+                                }
                                 server.broadcast(cmd);
                             }
 
@@ -333,10 +347,16 @@ public class DashboardFrame extends JFrame {
                                 System.out.println("🧹 Closing host window - notifying clients & freeing ports...");
                                 new Thread(() -> {
                                     server.broadcast("HOST_CLOSED"); // Notify all clients first
-                                    try { Thread.sleep(300); } catch (InterruptedException ignored) {} // Give network time to deliver
+                                    try {
+                                        Thread.sleep(300);
+                                    } catch (InterruptedException ignored) {
+                                    } // Give network time to deliver
                                     server.shutdown();             // Closes TCP
                                     udpDiscovery.stop();           // Closes UDP
-                                    try { currentSession.notifySessionEnd(); } catch (Exception ignored) {}
+                                    try {
+                                        currentSession.notifySessionEnd();
+                                    } catch (Exception ignored) {
+                                    }
                                     SwingUtilities.invokeLater(() -> statusLabel.setText(" Status: Ready"));
                                 }).start();
                             }
@@ -424,7 +444,10 @@ public class DashboardFrame extends JFrame {
                             System.out.println("🧹 Closing client window - freeing ports...");
                             new Thread(() -> {
                                 client.shutdown();            // Frees TCP socket
-                                try { currentSession.notifySessionEnd(); } catch (Exception ignored) {}
+                                try {
+                                    currentSession.notifySessionEnd();
+                                } catch (Exception ignored) {
+                                }
                                 SwingUtilities.invokeLater(() -> statusLabel.setText(" Status: Ready"));
                             }).start();
                         }
@@ -455,8 +478,5 @@ public class DashboardFrame extends JFrame {
         super.dispose();
     }
 
-    public void updateStatus(String text) {
-        SwingUtilities.invokeLater(() -> statusLabel.setText(" " + text));
-    }
 }
 

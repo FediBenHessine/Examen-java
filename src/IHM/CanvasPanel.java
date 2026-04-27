@@ -11,8 +11,6 @@ import java.util.function.Consumer;
 
 public class CanvasPanel extends JPanel {
     private final List<DrawCommand> history = new ArrayList<>();
-    private final Stack<List<DrawCommand>> undoStack = new Stack<>();
-    private final Stack<List<DrawCommand>> redoStack = new Stack<>();
     private DrawCommand currentStroke = null;
     private List<Point> penPath = null;
     private List<Point> eraserPath = null; // ✅ NEW: Store eraser path
@@ -64,7 +62,6 @@ public class CanvasPanel extends JPanel {
                     cmd.username = currentUsername;
                     cmd.payload = serializePath(penPath);
 
-                    saveUndoState();
                     history.add(cmd);
                     repaint();
                     broadcast(cmd);
@@ -73,7 +70,6 @@ public class CanvasPanel extends JPanel {
                     notifyHistoryChanged();
 
                 } else if (currentTool == DrawCommand.Type.ERASER && eraserPath != null && !eraserPath.isEmpty()) {
-                    saveUndoState();
 
                     // Remove intersecting strokes locally
                     List<DrawCommand> toRemove = new ArrayList<>();
@@ -96,7 +92,6 @@ public class CanvasPanel extends JPanel {
 
                 } else if (currentStroke != null) {
                     currentStroke.x2 = e.getX(); currentStroke.y2 = e.getY();
-                    saveUndoState();
                     history.add(currentStroke);
                     repaint();
                     broadcast(currentStroke);
@@ -160,7 +155,6 @@ public class CanvasPanel extends JPanel {
     }
 
     private void deleteStrokeAtPoint(Point p) {
-        saveUndoState();
         for (int i = history.size() - 1; i >= 0; i--) {
             if (isPointNearStroke(p, history.get(i))) {
                 history.remove(i);
@@ -222,45 +216,7 @@ public class CanvasPanel extends JPanel {
         this.currentUsername = username != null ? username : "UNKNOWN";
     }
 
-    // ✅ UNDO/REDO with proper stack management
-    private void saveUndoState() {
-        if (!history.isEmpty()) {
-            undoStack.push(new ArrayList<>(history));
-            redoStack.clear();  // Clear redo on new action (standard behavior)
-            notifyHistoryChanged();
-        }
-    }
 
-    public void undo() {
-        if (undoStack.isEmpty()) return;
-
-        redoStack.push(new ArrayList<>(history));  // Save current for redo
-        history.clear();
-        history.addAll(undoStack.pop());  // Restore previous state
-
-        repaint();
-        notifyHistoryChanged();
-
-        // Broadcast undo
-        broadcast(new DrawCommand(DrawCommand.Type.UNDO, currentUsername));
-    }
-
-    public void redo() {
-        if (redoStack.isEmpty()) return;
-
-        undoStack.push(new ArrayList<>(history));  // Save current for undo
-        history.clear();
-        history.addAll(redoStack.pop());  // Restore redone state
-
-        repaint();
-        notifyHistoryChanged();
-
-        // Broadcast redo
-        broadcast(new DrawCommand(DrawCommand.Type.REDO, currentUsername));
-    }
-
-    public boolean canUndo() { return !undoStack.isEmpty(); }
-    public boolean canRedo() { return !redoStack.isEmpty(); }
 
     // ✅ Process remote commands - SYNC ALL ACTIONS
     public void addRemoteCommand(String rawCmd) {
@@ -327,10 +283,7 @@ public class CanvasPanel extends JPanel {
     }
 
     public void clearLocal() {
-        saveUndoState();
         history.clear();
-        undoStack.clear();
-        redoStack.clear();
         repaint();
         notifyHistoryChanged();
     }
@@ -431,9 +384,7 @@ public class CanvasPanel extends JPanel {
     }
     private void addRemoteCommandInternal(String rawCmd, boolean isSyncReplay) {
         if ("CLEAR".equals(rawCmd)) {
-            if (!isSyncReplay) saveUndoState(); // Only save undo state for live commands
             history.clear();
-            if (!isSyncReplay) { undoStack.clear(); redoStack.clear(); } // Clear stacks on live clear
             repaint();
             notifyHistoryChanged();
             return;
@@ -444,29 +395,9 @@ public class CanvasPanel extends JPanel {
             DrawCommand cmd = CommandProtocol.deserialize(rawCmd);
             if (cmd == null) return;
 
-            // ✅ Handle ALL command types during sync replay
-            if (cmd.type == DrawCommand.Type.UNDO) {
-                if (!undoStack.isEmpty()) {
-                    redoStack.push(new ArrayList<>(history));
-                    history.clear();
-                    history.addAll(undoStack.pop());
-                    repaint();
-                    notifyHistoryChanged();
-                }
-                return;
-            }
-            if (cmd.type == DrawCommand.Type.REDO) {
-                if (!redoStack.isEmpty()) {
-                    undoStack.push(new ArrayList<>(history));
-                    history.clear();
-                    history.addAll(redoStack.pop());
-                    repaint();
-                    notifyHistoryChanged();
-                }
-                return;
-            }
+
+
             if (cmd.type == DrawCommand.Type.DELETE) {
-                if (!isSyncReplay) saveUndoState();
                 for (int i = history.size() - 1; i >= 0; i--) {
                     if (isPointNearStroke(new Point((int)cmd.x1, (int)cmd.y1), history.get(i))) {
                         history.remove(i);
@@ -478,7 +409,6 @@ public class CanvasPanel extends JPanel {
                 return;
             }
             if (cmd.type == DrawCommand.Type.ERASE_PATH) {
-                if (!isSyncReplay) saveUndoState();
                 List<Point> erasePath = deserializePath(cmd.payload);
                 double radius = Math.max(cmd.strokeWidth, 10.0) / 2;
                 List<DrawCommand> toRemove = new ArrayList<>();
