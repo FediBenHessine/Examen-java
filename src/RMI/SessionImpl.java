@@ -25,8 +25,8 @@ public class SessionImpl extends UnicastRemoteObject implements RemoteSession {
             throw new RemoteException("Username cannot be empty");
 
         // Verify user exists in DB
-        if (!DatabaseManager.userExists(username.trim()))
-            throw new RemoteException("User not found in database");
+//        if (!DatabaseManager.userExists(username.trim()))
+//            throw new RemoteException("User not found in database");
 
         // Track this user as the one about to call notifySessionStart
         this.lastRegisteredUser = username.trim();
