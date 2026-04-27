@@ -242,6 +242,19 @@ public class WhiteboardFrame extends JFrame {
         if ("CLEAR".equals(rawCmd)) { canvas.clearLocal(); return; }
 
         // All other commands go through canvas (which handles sync queuing)
+        // ✅ HOST: Store client commands in database (but not our own echoing back)
+        if (isHost) {
+            try {
+                DrawCommand cmd = CommandProtocol.deserialize(rawCmd);
+                if (cmd != null && cmd.username != null && !cmd.username.equals(username)) {
+                    // This is a command from a client - store it in the database
+                    DatabaseManager.insertDrawCommand(sessionId, cmd);
+                    System.out.println("💾 Stored client command from " + cmd.username + ": " + cmd.type);
+                }
+            } catch (Exception e) {
+                System.err.println("⚠️ Failed to store client command: " + e.getMessage());
+            }
+        }
         canvas.addRemoteCommand(rawCmd);
     }
     // ✅ Update undo/redo button states

@@ -76,4 +76,14 @@ public class SessionImpl extends UnicastRemoteObject implements RemoteSession {
     public boolean ping() throws RemoteException {
         return isHostActive && !activeUsers.isEmpty();
     }
+
+    @Override
+    public void insertDrawCommand(int sessionId, Model.DrawCommand cmd) throws RemoteException {
+        DatabaseManager.insertDrawCommand(sessionId, cmd);
+    }
+
+    @Override
+    public java.util.List<String> getDrawCommandsForSession(int sessionId) throws RemoteException {
+        return DatabaseManager.getDrawCommandsForSession(sessionId);
+    }
 }

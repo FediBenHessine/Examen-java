@@ -295,7 +295,7 @@ public class DatabaseManager {
         }
     }
     /**
-     * Get room info by host IP (for direct join)
+     * Get room info by host IP (for direct join) - connects to remote database
      * Returns null if no active room found at that IP
      */
     public static RoomInfo getRoomByIP(String hostIP) {
@@ -303,7 +303,7 @@ public class DatabaseManager {
                 "FROM rooms r JOIN users u ON r.host_username = u.username " +
                 "JOIN room_types rt ON r.room_type_id = rt.id " +
                 "WHERE r.host_ip = ? AND r.is_active = TRUE ORDER BY r.id DESC LIMIT 1";
-        try (Connection conn = getConnection();
+        try (Connection conn = Singleton.getRemoteConnection(hostIP);
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, hostIP);
             try (ResultSet rs = ps.executeQuery()) {
@@ -320,7 +320,7 @@ public class DatabaseManager {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("❌ Failed to get room by IP: " + e.getMessage());
+            System.err.println("❌ Failed to get room by IP from remote host " + hostIP + ": " + e.getMessage());
         }
         return null;
     }

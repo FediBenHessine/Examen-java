@@ -24,6 +24,12 @@ public class Singleton {
     public static Connection getConnection() throws SQLException {
         return DriverManager.getConnection(URL_DB,USERNAME,PASSWORD);
     }
+
+    // Creates a connection to a remote host's database
+    public static Connection getRemoteConnection(String hostIP) throws SQLException {
+        return DriverManager.getConnection(DatabaseConfig.getRemoteURL(hostIP), USERNAME, PASSWORD);
+    }
+
     public static void main(String[] args) {
 //        System.out.println(Singleton.getConnection());
 
